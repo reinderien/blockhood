@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import lzma, pickle, re
+import lzma, numpy as np, pickle, re
 from functools import reduce
 from itertools import count
-from numpy import ndarray
+from os.path import isfile
 from requests import get
 from scipy.optimize import linprog
 
@@ -14,7 +14,11 @@ class DiscontinuedError(Exception):
     pass
 
 
-class IncompleteError(Exception):
+class StubError(Exception):
+    pass
+
+
+class PagedOutError(Exception):
     pass
 
 
@@ -26,11 +30,13 @@ class Block:
         self.title = data['title']
         revs = data.get('revisions')
         if not revs:
-            raise IncompleteError(self.title + ' is incomplete')
+            raise PagedOutError(self.title + ' not in this page')
 
         content = data['revisions'][0]['*']
         if 'Discontinued' in content:
             raise DiscontinuedError(self.title + ' is discontinued')
+        if 'Infobox' not in content:
+            raise StubError(self.title + ' is an incomplete stub')
 
         self.category = self.re_cat.search(content).group(1)
 
@@ -75,27 +81,29 @@ def iter_blocks():
     while True:
         resp = get('https://blockhood.gamepedia.com/api.php', params=params).json()
 
-        n_complete, n_incomplete, n_discontinued = 0, 0, 0
+        n_complete, n_paged, n_discontinued, n_stub = 0, 0, 0, 0
 
         for block_data in resp['query']['pages'].values():
             try:
                 yield Block(block_data)
                 n_complete += 1
-            except IncompleteError:
-                n_incomplete += 1
+            except PagedOutError:
+                n_paged += 1
             except DiscontinuedError:
                 n_discontinued += 1
+            except StubError as e:
+                n_stub += 1
+                print(str(e))
 
-        print('Processed %d complete, %d incomplete, %d discontinued' %
-              (n_complete, n_incomplete, n_discontinued))
+        print('Processed %d complete, %d paged, %d discontinued, %d stubs' %
+              (n_complete, n_paged, n_discontinued, n_stub))
 
         if 'batchcomplete' in resp:
             break
         params.update(resp['continue'])
 
 
-def save():
-    blocks = sorted(iter_blocks())
+def save(blocks):
     print('Total complete: %d' % len(blocks))
 
     with lzma.open(FN, 'wb') as lz:
@@ -135,10 +143,39 @@ def analyse(blocks):
     """
 
     resource_names = sorted(reduce(set.union, (b.resource_names for b in blocks)))
-    resource_indices = {n: i for i, n in enumerate(resource_names.keys())}
+    resource_indices = {n: i for i, n in enumerate(resource_names)}
+
+    nr = len(resource_names)
+    nb = len(blocks)
+
+    rates_no_opt = np.empty((nr, 0))          # Resource rates without optional inputs
+    rates_opt = np.empty((nr, 0))             # Optional rates
+
+    def iter_res(col, attr, mu):
+        for resource, qty in getattr(block, attr).items():
+            col[resource_indices[resource]] += mu*qty
+
+    for b, block in enumerate(blocks):
+        nocol = [0]*nr                      # Column of mandatory rates for this block
+        opcol = list(nocol)                 # Column of optional rates for this block
+        iter_res(nocol, 'res_in', -1)
+        iter_res(nocol, 'res_out', 1)
+        iter_res(opcol, 'res_in_opt', -1)
+        np.append(rates_no_opt, nocol)
+        np.append(rates_opt, opcol)
+
+        # todo
 
     return None
 
 
-# save()
-analyse(load())
+def main():
+    if isfile(FN):
+        blocks = load()
+    else:
+        blocks = sorted(iter_blocks())
+        save(blocks)
+    analyse(blocks)
+
+
+main()
