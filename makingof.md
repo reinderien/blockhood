@@ -99,13 +99,19 @@ Still useless.
 Using the somewhat-sketchy-looking and unhelpfully closed-source
 [UABE](https://github.com/DerPopo/UABE),
  it apparently successfully decodes the .assets bundle. In the list it presents, we ignore graphics and audio items, and
- find this:
+ find these:
 
     Name:    MonoBehaviour blockDB_current
     Type:    MonoBehaviour: BlockDatabase (Assembly-CSharp.dll)
     File ID: 0
     Path ID: 21228
     Size:    803924 bytes
+
+    Name:    MonoBehaviour resourceDB
+    Type:    MonoBehaviour: ResourceDatabase (Assembly-CSharp.dll)
+    File ID: 0
+    Path ID: 21231
+    Size:    73240 bytes
 
 Do a binary export of that file and it gets us something that appears to be a densely-packed serialized C# object.
 
