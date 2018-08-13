@@ -63,6 +63,53 @@ Second approach: scrape the game itself. Based on a dumb directory search, the d
 
     SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets
 
+This file is a [Unity](https://unity3d.com) assets bundle. To decode it we could use the apparently undocumented tool
+
+    Unity\Editor\Data\Tools\binary2text.exe
+
+Its usage blurb merely states:
+
+    Usage: binary2text inputbinaryfile [outputtextfile] [-detailed]
+
+To my "delight", the most recent version of Unity cannot parse this bundle, so apparently it's not at all
+backwards-compatible:
+
+    Invalid serialized file version. File: "SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets".
+    Expected version: 2018.2.3f1. Actual version: 5.6.2f1.
+
+Using the tool from the older Unity 5.6.2 gets farther, producing:
+
+    External References
+    path(1): "globalgamemanagers.assets" GUID: 00000000000000000000000000000000 Type: 0
+    path(2): "resources/unity_builtin_extra" GUID: 0000000000000000f000000000000000 Type: 0
+    path(3): "library/unity default resources" GUID: 0000000000000000e000000000000000 Type: 0
+    path(4): "resources.assets" GUID: 00000000000000000000000000000000 Type: 0
+    path(5): "sharedassets0.assets" GUID: 00000000000000000000000000000000 Type: 0
+    path(6): "sharedassets1.assets" GUID: 00000000000000000000000000000000 Type: 0
+    
+    Object #0 (ClassID: 150) at byte 439904 without type tree
+    Object #1 (ClassID: 21) at byte 447608 without type tree
+    Object #2 (ClassID: 21) at byte 448704 without type tree
+    Object #3 (ClassID: 21) at byte 449800 without type tree
+    Object #4 (ClassID: 21) at byte 449992 without type tree
+    ...
+
+Still useless.
+
+Using the somewhat-sketchy-looking and unhelpfully closed-source
+[UABE](https://github.com/DerPopo/UABE),
+
+- Apparently successfully decode the .assets bundle
+- Ignore graphics and audio items, and find this:
+
+    Name: MonoBehaviour blockDB_current
+    Type: MonoBehaviour: BlockDatabase (Assembly-CSharp.dll)
+    File ID: 0
+    Path ID: 21228
+    Size: 803924 bytes
+
+- Do a binary export
+
 Let's look at a particular example, the Tech Office, because it has input, output and optional input resources, a name
 with a space, and a floating-point rate:
 
@@ -124,86 +171,7 @@ The following seems to describe the technology resource itself:
     03F9B900 Technology - 40
              TECHNOLOGY $ Amount of applied science knowledge.
              (followed by translations)
-    
 
-
-
-
-
-This file is a [Unity](https://unity3d.com) assets bundle. To decode it we need the apparently undocumented tool
-
-    Unity\Editor\Data\Tools\binary2text.exe
-
-Its usage blurb merely states:
-
-    Usage: binary2text inputbinaryfile [outputtextfile] [-detailed]
-
-To my "delight", the most recent version of Unity cannot parse this bundle, so apparently it's not at all
-backwards-compatible:
-
-    Invalid serialized file version. File: "SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets".
-    Expected version: 2018.2.3f1. Actual version: 5.6.2f1.
-
-Using the tool from the older Unity 5.6.2 gets farther, producing:
-
-    External References
-    path(1): "globalgamemanagers.assets" GUID: 00000000000000000000000000000000 Type: 0
-    path(2): "resources/unity_builtin_extra" GUID: 0000000000000000f000000000000000 Type: 0
-    path(3): "library/unity default resources" GUID: 0000000000000000e000000000000000 Type: 0
-    path(4): "resources.assets" GUID: 00000000000000000000000000000000 Type: 0
-    path(5): "sharedassets0.assets" GUID: 00000000000000000000000000000000 Type: 0
-    path(6): "sharedassets1.assets" GUID: 00000000000000000000000000000000 Type: 0
-    
-    Object #0 (ClassID: 150) at byte 439904 without type tree
-    Object #1 (ClassID: 21) at byte 447608 without type tree
-    Object #2 (ClassID: 21) at byte 448704 without type tree
-    Object #3 (ClassID: 21) at byte 449800 without type tree
-    Object #4 (ClassID: 21) at byte 449992 without type tree
-    ...
-
-Still useless.
-
-Using the somewhat-sketchy-looking and unhelpfully closed-source
-[UABE](https://github.com/DerPopo/UABE),
-
-- Apparently successfully decode the .assets bundle
-- Do a search by name of (for example) "playground" (one of the block types)
-- Ignore graphics and audio items, looking only at the three GameObjects
-- Do a text dump
-
-This produces minor variations on something looking like
-
-    0 GameObject Base
-     0 vector m_Component
-      0 Array Array (5 items)
-       0 int size = 5
-       [0]
-        0 ComponentPair data
-         0 PPtr<Component> component
-          0 int m_FileID = 0
-          0 SInt64 m_PathID = 13548
-       [1]
-        0 ComponentPair data
-         0 PPtr<Component> component
-          0 int m_FileID = 0
-          0 SInt64 m_PathID = 19120
-       ...
-     0 unsigned int m_Layer = 12
-     1 string m_Name = "PlayGround"
-     0 UInt16 m_Tag = 0
-     0 bool m_IsActive = true
-
-The list of path references from these files:
-
-    11161, 11441, 13548 (Transform)
-    17858, 18179, 18197 (MeshRenderer)
-    19120, 19326, 19464 (MeshFilter)
-    19871, 19939, 20021, 20033 (BoxCollider)
-    
-So another dead end - this appears to only be graphical information.
-
-
-    
 
 Analysis
 --------
