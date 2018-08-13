@@ -7,6 +7,7 @@ from os.path import isfile
 from requests import get
 from scipy.optimize import linprog
 
+
 FN = 'blocks.pickle.xz'
 
 
@@ -169,13 +170,101 @@ def analyse(blocks):
     return None
 
 
+def decompile(blocks, fn):
+    print('Loading assets...')
+
+    # Todo - reintroduce
+    # asstools = ctypes.cdll.LoadLibrary('AssetsToolsAPI_2.2beta3/bin64/AssetsTools.dll')
+
+    with open(fn, 'rb') as f:
+        # We have a lot of memory, so just load it (67MB)
+        assets = f.read()
+
+    print('Finding blocks...')
+
+    interesting_strings = tuple(s.encode('ascii') for s in (
+                                'allways',
+                                'alwaysProducing',
+                                'blocksProducing',
+                                'directNeighbors',
+                                'neighborDecay',
+                                'neighborExist',
+                                'neighborProducing',
+                                'neighborProducingMultiple',
+                                'oneAdjacentNeighbor',
+                                'threeSquareNeighbors'))
+
+    occurrences = []
+    for ins in interesting_strings:
+        i = 0
+        while True:
+            i = assets.find(ins, i)
+            if i == -1:
+                break
+            occurrences.append(i)
+            i += 1
+    occurrences = sorted(occurrences)
+
+    # pitches = [occurrences[i+1] - occurrences[i]
+    #            for i in range(len(occurrences)-1)]
+    # pitches are on the order of 12-32 within group, 2000-4000 out of group
+    thresh = 200
+
+    block_locations = []
+    prev_o = 0
+    for o in occurrences:
+        if o - prev_o > thresh:
+            block_locations.append(o)
+        prev_o = o
+
+    print('Finding block correspondence...')
+
+    '''
+    # Before the first interesting string occurrence, there are three nulls at least.
+    # This is probably because field length precedes the field, and is in little-endian integer format.
+    # However, this fails for some corner cases.
+    
+    print('Verifying block metadata...')
+
+    for o in occurrences:
+        start = o
+        while True:
+            while True:
+                packed = assets[start-4:start]
+                text_len = unpack('I', packed)[0]
+                if text_len != 1:
+                    break
+                print('Warning, skipping')
+                start += 4
+            if text_len == 0:
+                break
+            field = assets[start:start+text_len]
+            assert(text_len == len(field))
+            assert(field in interesting_strings)
+
+            # 32-bit alignment
+            aligned_len = text_len & ~3
+            if aligned_len < text_len:
+                aligned_len += 4
+
+            for b in assets[start+text_len:start+aligned_len]:
+                assert(b == 0)
+
+            start += aligned_len + 4  # next size
+    '''
+
+    return occurrences
+
+
 def main():
     if isfile(FN):
         blocks = load()
     else:
         blocks = sorted(iter_blocks())
         save(blocks)
-    analyse(blocks)
+
+    # analyse(blocks)
+    decompile(blocks, 'sharedassets2.assets')
 
 
 main()
