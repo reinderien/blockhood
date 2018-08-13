@@ -117,11 +117,16 @@ The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompile
     // Assembly location: SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\Managed\Assembly-CSharp.dll
 
 - The assembly uses .NET 3.5 on runtime 2.0.50727/MSIL.
-- The assembly can be dynamically loaded or statically referenced, but if you try to load it into a Unity project, there
-  are conflict problems because the assemblies are named identically and Unity uses global objects with no namespace
+- The assembly can be dynamically loaded or statically referenced
+- If you try to statically reference it outside of Unity and then deserialize the class, you get
+  [`ECall methods must be packaged into a system module`](https://forum.unity.com/threads/c-error-ecall-methods-must-be-packaged-into-a-system-module.199361/)
+- If you try to load it into a Unity project, there are conflict problems because the assemblies are named identically 
+  and Unity uses global objects with no namespace
 - The `BlockDatabase` class is marked `[Serializable]` 
 - The class parent `ScriptableObject` is marked `[StructLayout(LayoutKind.Sequential)]`
-- The class cannot be deserialized via `Marshal.PtrToStructure` because it contains generic `List<>`
+- The class cannot be deserialized via
+  [`Marshal.PtrToStructure`](https://msdn.microsoft.com/en-us/library/4ca6d5z7(v=vs.110).aspx)
+  because it contains generic `List<>`
 - The class cannot be deserialized via
   [`BinaryFormatter`](https://msdn.microsoft.com/en-us/library/system.runtime.serialization.formatters.binary.binaryformatter(v=vs.110).aspx)
   because the database dump does not use that format
@@ -169,10 +174,12 @@ Using a hex editor, we see sections such as
     03D99AE0       decay_highTech_office
   
 Notably, the section between 03F10790 and 03F11260 contains i18n entries for the tech office and its decayed version in
-multiple languages; and the strings
+multiple languages; and the string
 
     03F10F90  HiTechOffice - 95
     
+These are "agent" strings:
+
     oneAdjacentNeighbor 
     threeSquareNeighbors
     directNeighbors
