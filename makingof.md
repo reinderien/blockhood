@@ -71,7 +71,7 @@ Its usage blurb merely states:
 
     Usage: binary2text inputbinaryfile [outputtextfile] [-detailed]
 
-To my "delight", the most recent version of Unity cannot parse this bundle, so apparently it's not at all
+To my "delight", the most recent version of Unity cannot parse this bundle, so apparently it's not whatsoever
 backwards-compatible:
 
     Invalid serialized file version. File: "SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets".
@@ -98,17 +98,36 @@ Still useless.
 
 Using the somewhat-sketchy-looking and unhelpfully closed-source
 [UABE](https://github.com/DerPopo/UABE),
+ it apparently successfully decodes the .assets bundle. In the list it presents, we ignore graphics and audio items, and
+ find this:
 
-- Apparently successfully decode the .assets bundle
-- Ignore graphics and audio items, and find this:
-
-    Name: MonoBehaviour blockDB_current
-    Type: MonoBehaviour: BlockDatabase (Assembly-CSharp.dll)
+    Name:    MonoBehaviour blockDB_current
+    Type:    MonoBehaviour: BlockDatabase (Assembly-CSharp.dll)
     File ID: 0
     Path ID: 21228
-    Size: 803924 bytes
+    Size:    803924 bytes
 
-- Do a binary export
+Do a binary export of that file and it gets us something that appears to be a densely-packed serialized C# object.
+
+The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompiler). The class of interest is:
+
+    // Type: BlockDatabase
+    // Assembly: Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    // MVID: 9389A4AF-DACD-4250-864C-FFB1C86AE6D0
+    // Assembly location: SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\Managed\Assembly-CSharp.dll
+
+- The assembly uses .NET 3.5 on runtime 2.0.50727/MSIL.
+- The assembly can be dynamically loaded or statically referenced, but if you try to load it into a Unity project, there
+  are conflict problems because the assemblies are named identically and Unity uses global objects with no namespace
+- The `BlockDatabase` class is marked `[Serializable]` 
+- The class parent `ScriptableObject` is marked `[StructLayout(LayoutKind.Sequential)]`
+- The class cannot be deserialized via `Marshal.PtrToStructure` because it contains generic `List<>`
+- The class cannot be deserialized via
+  [`BinaryFormatter`](https://msdn.microsoft.com/en-us/library/system.runtime.serialization.formatters.binary.binaryformatter(v=vs.110).aspx)
+  because the database dump does not use that format
+- The Unity deserialization code is probably in an unmanaged assembly to which this assembly refers using `extern`
+
+Looking at the binary database dump file in a hex editor:
 
 Let's look at a particular example, the Tech Office, because it has input, output and optional input resources, a name
 with a space, and a floating-point rate:
