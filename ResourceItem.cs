@@ -10,12 +10,9 @@ using UnityEngine;
 [Serializable]
 public class ResourceItem
 {
-  #region Members
-
   public Sprite icon;
   public string myName;
   public float cost;
-  private Manager myManager;
   public string alias;
   public string description;
   public string alias_spanish;
@@ -39,12 +36,10 @@ public class ResourceItem
   public string alias_hungarian;
   public string description_hungarian;
   public int levelOfFinish;
-  public ResourceItem.Category category;
-  public ResourceItem.Tags tag;
-  public ResourceItem.Units myUnits;
+  public Category category;
+  public Tags tag;
+  public Units myUnits;
 
-  #endregion
-	
   public enum Category
   {
     EMPTY,

@@ -113,7 +113,8 @@ Using the somewhat-sketchy-looking and unhelpfully closed-source
     Path ID: 21231
     Size:    73240 bytes
 
-Do a binary export of that file and it gets us something that appears to be a densely-packed serialized C# object.
+Do a binary export of that file and it gets us something that appears to be a 32-bit-aligned serialized C# object. The
+strings are UTF-8-encoded, which is particularly important for the text in international languages.
 
 The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompiler). The class of interest is:
 
@@ -138,72 +139,9 @@ The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompile
   because the database dump does not use that format
 - The Unity deserialization code is probably in an unmanaged assembly to which this assembly refers using `extern`
 
-Looking at the binary database dump file in a hex editor:
-
-Let's look at a particular example, the Tech Office, because it has input, output and optional input resources, a name
-with a space, and a floating-point rate:
-
-    Name - Tech Office
-    Description - This office is dedicated to incubating startups and tech sector businesses.
-
-Using https://www.h-schmidt.net/FloatConverter/IEEE754.html and showing as little-endian:
-
-    Inputs -          String    Int           Float
-       data           2         02 00 00 00   00 00 00 40
-       electricity    1.5                     00 00 C0 3F
-       labour         2         02 00 00 00   00 00 00 40
-    Optional inputs -
-       roasted coffee 1         01 00 00 00   00 00 80 3F
-    Outputs -
-       Technology     4         04 00 00 00   00 00 80 40
-       Money          4         04 00 00 00   00 00 80 40
-    
-Using a hex editor, we see sections such as
-
-    0009D580             highTech_office_mesh
-    000C3530       decay_highTech_office
-    000C38C0       decay_highTech_office_mesh
-    000C3950             highTech_office
-    000C3CE0             highTech_office_mesh
-    0046FA30       decay_highTech_office_mesh
-    00474970       decay_highTech_office
-    00521390             highTech_office_mesh
-    00526130             highTech_office_mesh2
-    00528DB0             highTech_office
-    00751C40       white_highTech_office
-    00751FA0 white_decay_highTech_office
-    038A11E0            bi_b_tech_office
-    03D8A730             highTech_office
-    03D8BAC0       decay_highTech_office
-    03D92A30             highTech_office
-    03D92A70             highTech_officeGhost
-    03D99AE0       decay_highTech_office
-  
-Notably, the section between 03F10790 and 03F11260 contains i18n entries for the tech office and its decayed version in
-multiple languages; and the string
-
-    03F10F90  HiTechOffice - 95
-    
-These are "agent" strings:
-
-    oneAdjacentNeighbor 
-    threeSquareNeighbors
-    directNeighbors
-    blocksProducing
-    neighborProducing
-    alwaysProducing
-    allways
-    neighborProducingMultiple
-    neighborExist
-    neighborDecay
-    blocksProducing
-    
-The following seems to describe the technology resource itself:
-
-    03F9B900 Technology - 40
-             TECHNOLOGY $ Amount of applied science knowledge.
-             (followed by translations)
-
+Looking at the binary database dump file in a hex editor, it's fairly easy to line up the binary fields with those
+shown in the decompiled model class. The integers and floats are in standard IEEE format, and the strings are
+non-terminated and preceded by length.
 
 Analysis
 --------
