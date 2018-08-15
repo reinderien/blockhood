@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-import lzma, numpy as np, pickle, re
-from csv import DictWriter
+import fieldtypes, lzma, numpy as np, pickle, re
+from collections import namedtuple
 from functools import reduce
+from io import SEEK_SET
 from itertools import count
 from os.path import isfile
 from pprint import pprint
 from requests import get
 from scipy.optimize import linprog
-from struct import unpack
 
 
 FN = 'blocks.pickle.xz'
@@ -173,89 +173,68 @@ def analyse(blocks):
     return None
 
 
+Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_name', 'field_type'))
+
+
+class AssetDecoder:
+    def __init__(self, db_fn, source_fn, first_offset):
+        self.f = open(db_fn, 'rb')
+        self.f.seek(first_offset, SEEK_SET)
+        self.items = []
+
+        with open(source_fn, encoding='utf-8') as f:
+            src = f.read()
+
+        types = [fieldtypes.Int(), fieldtypes.Float(), fieldtypes.String(), fieldtypes.AssetRef()]
+
+        for tm in re.finditer(r'\s*public enum (\S+)$', src, re.M):
+            type_name = tm.group(1)
+            start = tm.start(1)
+            end = src.index('}', start)
+            val_src = src[start:end]
+            vals = tuple(m.group(1) for m in
+                         re.finditer(r'\s*(\S+),$', val_src, re.M))
+            types.append(fieldtypes.Enum(type_name, vals))
+
+        self.mbrs = []
+
+        for field_index, m in enumerate(re.finditer(r'^\s*(public|private)'
+                                                    r'\s+(\S+)' 
+                                                    r'\s+(\S+);', src, re.M)):
+            access, type_name, field_name = m.groups()
+            field_type = next(t for t in types if t.pat.match(type_name))
+            self.mbrs.append(Member(field_index, access, type_name, field_name, field_type))
+
+    def decode(self):
+        for list_index in count():
+            item = {}
+            for field in self.mbrs:
+                file_off = self.f.tell()
+                try:
+                    val = field.field_type.read(self.f)
+                except EOFError:
+                    return
+                item_field = {m: getattr(field, m) for m in Member._fields}
+                item_field.update({
+                    'listindex': list_index,
+                    'fileoffdec': file_off,
+                    'fileoffhex': '0x{0:08X}'.format(file_off),
+                    'val': val
+                })
+                pprint(item_field)
+                item[field.field_name] = val
+            self.items.append(item)
+
+
 def decompile():
     print('Loading assets...')
 
-    # with open('blockDB.dat', 'rb') as f:
-    #     block_db = f.read()
-    with open('resourceDB.dat', 'rb') as f:
-        resource_db = f.read()
+    rad = AssetDecoder('resourceDB.dat', 'ResourceItem.cs', 292)
+    # bad = AssetDecoder('blockDB.dat', 'Block.cs', 292)
+    rad.decode()
 
-    with open('ResourceItem.cs', 'r', encoding='utf-8') as f:
-        resource_src = f.read()
-    with open('Block.cs', 'r', encoding='utf-8') as f:
-        block_src = f.read()
-
-    r_mbrs = tuple((m.group(2), m.group(3)) for m in
-                   re.finditer(r'^\s*(public|private)'  # access
-                               r'\s+(\S+)'              # type 
-                               r'\s+(\S+);'             # name
-                        , resource_src, re.M))
-
-    enums = {}
-    for tm in re.finditer(r'\s*public enum (\S+)$', resource_src, re.M):
-        typename = tm.group(1)
-        start = tm.start(1)
-        end = resource_src.index('}', start)
-        vals = resource_src[start:end]
-        enums[typename] = tuple(m.group(1) for m in
-                                re.finditer(r'\s*(\S+),$', vals, re.M))
-
-    with open('resource_offsets.csv', 'w', encoding='utf-8', newline='') as f:
-        writer = DictWriter(f, ('listindex', 'fieldindex', 'type', 'name',
-                                'fileoffdec', 'fileoffhex', 'len', 'val'))
-        writer.writeheader()
-        file_off = 292
-        for list_index in count():
-            if file_off >= len(resource_db):
-                break
-
-            for field_index, (field_type, name) in enumerate(r_mbrs):
-
-                if field_type == 'string':
-                    str_len = unpack('I', resource_db[file_off:file_off+4])[0] + 4
-                    val = resource_db[file_off+4: file_off+str_len].decode('utf-8')
-                    field_len = str_len & ~3  # 4-byte align
-                    if field_len < str_len:
-                        field_len += 4
-
-                elif field_type == 'int':
-                    field_len = 4
-                    val = unpack('I', resource_db[file_off: file_off+field_len])[0]
-
-                elif field_type == 'float':
-                    field_len = 4
-                    val = unpack('f', resource_db[file_off: file_off+field_len])[0]
-
-                elif field_type in enums:
-                    field_len = 4
-                    raw_val = unpack('I', resource_db[file_off: file_off+field_len])[0]
-                    val = enums[field_type][raw_val]
-
-                elif field_type == 'Sprite':
-                    field_len = 12
-                    ids = unpack('II', resource_db[file_off: file_off+8])
-                    val = 'file=%d path=%d' % ids
-
-                else:
-                    field_len = 0
-                    val = ''
-
-                row = {
-                    'listindex': list_index,
-                    'fieldindex': field_index,
-                    'type': field_type,
-                    'name': name,
-                    'fileoffdec': file_off,
-                    'fileoffhex': '0x{0:08X}'.format(file_off),
-                    'len': field_len,
-                    'val': val
-                }
-                writer.writerow(row)
-                file_off += field_len
-
-                if name == 'myName':
-                    print(val)
+    return rad
+    # bad.decode()
 
 
 def main():

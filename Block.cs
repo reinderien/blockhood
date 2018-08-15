@@ -11,8 +11,6 @@ using UnityEngine;
 [Serializable]
 public class Block
 {
-    #region Members
-
     public int distanceToStreet = 1000;
     public List<int> inputs = new List<int>();
     public List<int> outputs = new List<int>();
@@ -65,7 +63,7 @@ public class Block
     public Texture AltWhite2;
     public GameObject ghostGeo;
     public Sprite icon;
-    private Manager myManager;
+    // private Manager myManager;
     public string alias_spanish;
     public string description_spanish;
     public string alias_japanese;
@@ -107,7 +105,7 @@ public class Block
     public string alias_hungarian_d;
     public string description_hungarian_d;
     public int blockToCopy;
-    public Block.Category category;
+    public Category category;
     public int ID;
     public int IDinArray;
     public int moneyCost;
@@ -179,7 +177,7 @@ public class Block
     public bool inhabited;
     public int[] myConnections;
     private bool willDie;
-    public Block.SubCategory subCategory;
+    public SubCategory subCategory;
     public float synergy;
     public float prevSynergy;
     public bool weatherVarience;
@@ -207,8 +205,6 @@ public class Block
     public Material decayMaterial;
     public bool customRegen;
     private float rSeed;
-
-    #endregion
 
     public enum Category
     {
