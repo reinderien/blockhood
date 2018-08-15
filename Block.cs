@@ -37,7 +37,7 @@ public class Block
     public List<int> allNeighbors = new List<int>();
     public List<int> synergyBlocks = new List<int>();
     public List<float> synergyAmounts = new List<float>();
-    public List<Block.SubCategory> synergyBlockCategories = new List<Block.SubCategory>();
+    public List<SubCategory> synergyBlockCategories = new List<SubCategory>();
     public List<float> synergyCategoriesAmounts = new List<float>();
     private int lastMonth = -1;
     public int agentInhabitingID = -1;
