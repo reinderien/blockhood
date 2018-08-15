@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import fieldtypes, lzma, numpy as np, pickle, re
-from collections import namedtuple
 from functools import reduce
 from io import SEEK_SET
 from itertools import count
@@ -42,9 +41,9 @@ class Block:
         if 'Infobox' not in content:
             raise StubError(self.title + ' is an incomplete stub')
 
-        self.category = self.re_cat.search(content).group(1)
+        self.category = self.re_cat.search(content)[1]
 
-        props = {m.group(1): m.group(2) for m in self.re_prop.finditer(content)}
+        props = {m[1]: m[2] for m in self.re_prop.finditer(content)}
         self.desc = props.get('desc')
 
         self.res_in, self.res_in_opt, self.res_out = {}, {}, {}
@@ -173,68 +172,89 @@ def analyse(blocks):
     return None
 
 
-Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_name', 'field_type'))
-
-
 class AssetDecoder:
     def __init__(self, db_fn, source_fn, first_offset):
         self.f = open(db_fn, 'rb')
-        self.f.seek(first_offset, SEEK_SET)
+        # self.f.seek(first_offset, SEEK_SET)  # todo
         self.items = []
 
         with open(source_fn, encoding='utf-8') as f:
             src = f.read()
+        self.mbrs = list(fieldtypes.get_members(src))
 
-        types = [fieldtypes.Int(), fieldtypes.Float(), fieldtypes.String(), fieldtypes.AssetRef()]
-
-        for tm in re.finditer(r'\s*public enum (\S+)$', src, re.M):
-            type_name = tm.group(1)
-            start = tm.start(1)
-            end = src.index('}', start)
-            val_src = src[start:end]
-            vals = tuple(m.group(1) for m in
-                         re.finditer(r'\s*(\S+),$', val_src, re.M))
-            types.append(fieldtypes.Enum(type_name, vals))
-
-        self.mbrs = []
-
-        for field_index, m in enumerate(re.finditer(r'^\s*(public|private)'
-                                                    r'\s+(\S+)' 
-                                                    r'\s+(\S+);', src, re.M)):
-            access, type_name, field_name = m.groups()
-            field_type = next(t for t in types if t.pat.match(type_name))
-            self.mbrs.append(Member(field_index, access, type_name, field_name, field_type))
+        self.sections = [
+            # 0: empty
+            {
+                'list_index': 50,  # Corner store
+                'start_off': 43176,
+                'start_field': 'inputs',
+                'end_field': 'optionalInputsAmounts'
+            },
+            {
+                'list_index': 1,
+                'start_off': 1380,
+                'start_field': 'chance1',
+                'end_field': 'inhabitable'  # 4296
+            },
+            {
+                'list_index': 1,
+                'start_off': 4400,
+                'start_field': 'allAgentFunctionsString',
+                'end_field': 'needsAccessToProduce'  # 4652
+            },
+            {
+                'list_index': 1,
+                'start_off': 4644,
+                'start_field': 'myType',
+                'end_field': 'prevSynergy'  # 4912
+            },
+            {
+                'list_index': 2,
+                'start_off': 5224,
+                'start_field': 'icon',
+                'end_field': 'streetAccess'  # 7920
+            }
+        ]
 
     def decode(self):
-        for list_index in count():
-            item = {}
-            for field in self.mbrs:
+        # for list_index in count():
+            # for field in self.mbrs:
+        for section in self.sections:
+            # file_off = self.f.tell()
+            self.f.seek(section['start_off'], SEEK_SET)
+            start_idx = next(i for i,m in enumerate(self.mbrs) if m.field_name == section['start_field'])
+            end_idx = 1 + next(i for i,m in enumerate(self.mbrs) if m.field_name == section['end_field'])
+            for field in self.mbrs[start_idx: end_idx]:
+                list_index = section['list_index']
                 file_off = self.f.tell()
                 try:
                     val = field.field_type.read(self.f)
                 except EOFError:
                     return
-                item_field = {m: getattr(field, m) for m in Member._fields}
-                item_field.update({
-                    'listindex': list_index,
-                    'fileoffdec': file_off,
-                    'fileoffhex': '0x{0:08X}'.format(file_off),
-                    'val': val
-                })
-                pprint(item_field)
-                item[field.field_name] = val
-            self.items.append(item)
+
+                item_field = {m: getattr(field, m) for m in fieldtypes.Member._fields}
+                item_field.update(locals())
+                # pprint(item_field)
+
+                print('{list_index:>3,} '
+                      '{field_index:>3,} '
+                      '{file_off:>6,} '
+                      '{type_name:>12s} '
+                      '{field_name:<30s} '
+                      '{val}'.format(**item_field))
+                continue
+            print()
+                # item[field.field_name] = val
+            # self.items.append(item)
 
 
 def decompile():
     print('Loading assets...')
 
-    rad = AssetDecoder('resourceDB.dat', 'ResourceItem.cs', 292)
-    # bad = AssetDecoder('blockDB.dat', 'Block.cs', 292)
-    rad.decode()
-
-    return rad
-    # bad.decode()
+    # rad = AssetDecoder('resourceDB.dat', 'ResourceItem.cs', 292)
+    bad = AssetDecoder('blockDB.dat', 'Block.cs', 1464)
+    # rad.decode()
+    bad.decode()
 
 
 def main():
