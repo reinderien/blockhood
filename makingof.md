@@ -43,23 +43,23 @@ Data Acquisition
 ----------------
 
 To analyse this economy, the application needs a complete representation of all buildings and what they produce and
-consume at what rates. To do this, I'm pulling from the community-maintained
+consume at what rates. To do this, I originally pulled from the community-maintained
 [wiki](https://blockhood.gamepedia.com).
 
-The pulling itself, as always, uses [requests](http://docs.python-requests.org).
+The pulling itself, as always, used [requests](http://docs.python-requests.org).
 
 For parsing, first I was using [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup), but then discovered that
 I'm in luck: GamePedia uses MediaWiki and exposes a
 [nice, RESTful JSON API](https://www.mediawiki.org/wiki/API:Main_page). Form a sane request, write a pagination loop,
-and bam - we get the data we need.
+and bam - we get (most of) the data we need.
 
 But there's a problem. Many of the pages are
-[stubs](https://blockhood.gamepedia.com/Category:Stubs) and don't have the data we need. I'm too lazy to update them by
-hand, so I
+[stubs](https://blockhood.gamepedia.com/Category:Stubs) and don't have resource rate data. I'm too lazy to update them
+by hand, so I
 [asked the developer for some data](https://www.facebook.com/blockhoodgame/posts/1877621299022835)
 but haven't heard back.
 
-Second approach: scrape the game itself. Based on a dumb directory search, the data most likely live in this file:
+Second approach: scrape the game itself. Based on a dumb directory search, the data live in this file:
 
     SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets
 
@@ -116,12 +116,23 @@ Using the somewhat-sketchy-looking and unhelpfully closed-source
 Do a binary export of that file and it gets us something that appears to be a 32-bit-aligned serialized C# object. The
 strings are UTF-8-encoded, which is particularly important for the text in international languages.
 
-The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompiler). The class of interest is:
+The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompiler). The classes of interest are:
 
     // Type: BlockDatabase
     // Assembly: Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
     // MVID: 9389A4AF-DACD-4250-864C-FFB1C86AE6D0
     // Assembly location: SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\Managed\Assembly-CSharp.dll
+    
+    // Type: Block
+    // Assembly: Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    // MVID: 9389A4AF-DACD-4250-864C-FFB1C86AE6D0
+    // Assembly location: SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\Managed\Assembly-CSharp.dll
+    
+    // Type: ResourceItem
+    // Assembly: Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+    // MVID: 9389A4AF-DACD-4250-864C-FFB1C86AE6D0
+    // Assembly location: SteamLibrary\steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\Managed\Assembly-CSharp.dll
+
 
 - The assembly uses .NET 3.5 on runtime 2.0.50727/MSIL.
 - The assembly can be dynamically loaded or statically referenced
@@ -130,7 +141,9 @@ The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompile
 - If you try to load it into a Unity project, there are conflict problems because the assemblies are named identically 
   and Unity uses global objects with no namespace
 - The `BlockDatabase` class is marked `[Serializable]` 
-- The class parent `ScriptableObject` is marked `[StructLayout(LayoutKind.Sequential)]`
+- The class parent `ScriptableObject` is marked `[StructLayout(LayoutKind.Sequential)]`, but this is only true for
+  `ResourceItem`, not for `Block`. `Block` is broken up into several sequential sections that are out of order with
+  respect to the decompiled fields.
 - The class cannot be deserialized via
   [`Marshal.PtrToStructure`](https://msdn.microsoft.com/en-us/library/4ca6d5z7(v=vs.110).aspx)
   because it contains generic `List<>`
@@ -139,9 +152,13 @@ The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompile
   because the database dump does not use that format
 - The Unity deserialization code is probably in an unmanaged assembly to which this assembly refers using `extern`
 
-Looking at the binary database dump file in a hex editor, it's fairly easy to line up the binary fields with those
-shown in the decompiled model class. The integers and floats are in standard IEEE format, and the strings are
+Looking at the binary resource database dump file in a hex editor, it's fairly easy to line up the binary fields with
+those shown in the decompiled model class. The integers and floats are in standard IEEE format, and the strings are
 non-terminated and preceded by length.
+
+The block database is screwier. Some of the same format elements are used, but the members are out of order. However,
+the member order is the same across each `Block` record. As such, a heuristic approach can find certain well-known
+strings, and decode the database.
 
 Analysis
 --------
