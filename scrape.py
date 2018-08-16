@@ -7,7 +7,7 @@ from io import SEEK_SET, BytesIO
 from scipy.optimize import linprog
 
 
-def analyse(blocks):
+def analyse(blocks, resources):
     """
     193 blocks, 53 resources
 
@@ -31,7 +31,7 @@ def analyse(blocks):
       Use Aub and bub for this.
     """
 
-    resource_names = sorted(reduce(set.union, (b.resource_names for b in blocks)))
+    resource_names = sorted(r['alias'] for r in resources)
     resource_indices = {n: i for i, n in enumerate(resource_names)}
 
     nr = len(resource_names)
@@ -146,6 +146,7 @@ def decompile():
     def read_rate():
         return t_float_list.read(rate_sect)
 
+    blocks = []
     while True:
         agent_str_start = data.find(agent_needle, agent_str_start)
         if agent_str_start == -1:
@@ -179,18 +180,19 @@ def decompile():
                 input_amounts, output_amounts = read_rate(), read_rate()
                 optional_input_names, optional_input_amounts = read_res(), read_rate()
 
-                yield BlockRates(
+                blocks.append(BlockRates(
                     namestr,
                     {n: a for n, a in zip(input_names, input_amounts)},
                     {n: a for n, a in zip(output_names, output_amounts)},
-                    {n: a for n, a in zip(optional_input_names, optional_input_amounts)})
+                    {n: a for n, a in zip(optional_input_names, optional_input_amounts)}))
 
         agent_str_start += len(agent_needle)
+    return sorted(blocks, key=lambda b: b.name), rad.items
 
 
 def main():
-    blocks = sorted(decompile(), key=lambda x: x.name)
-    # analyse(blocks)
+    blocks, resources = decompile()
+    analyse(blocks, resources)
     return
 
 
