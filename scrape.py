@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import fieldtypes, lzma, numpy as np, pickle, re
+import fieldtypes, lzma, numpy as np, pickle, re, struct
 from functools import reduce
 from io import SEEK_SET
 from itertools import count
@@ -191,19 +191,51 @@ class AssetDecoder:
                     val = field.field_type.read(self.f)
                 except EOFError:
                     return
-
-                item_field = {m: getattr(field, m) for m in fieldtypes.Member._fields}
-                item_field.update(locals())
-
-                print('{list_index:>3,} '
-                      '{field_index:>3,} '
-                      '{file_off:>6,} '
-                      '{type_name:>12s} '
-                      '{field_name:<30s} '
-                      '{val}'.format(**item_field))
                 item[field.field_name] = val
-            print()
             self.items.append(item)
+
+
+def align4(i):
+    needs_pad = i & 3
+    if needs_pad:
+        i += 4 - needs_pad
+    return i
+
+
+def find_str(data, end):
+    nrun = 0
+    last_i = None
+    for i in range(end - 1, end - 500, -1):
+        if ord(' ') <= data[i] <= ord('z'):
+            nrun += 1
+            if nrun >= 10:
+                break
+        else:
+            nrun = 0
+            last_i = i
+    else:
+        return
+
+    last_i = align4(last_i)
+    return find_by_int(data, last_i)
+
+
+def find_by_int(data, end):
+    for i in range(end - 8, end - 500, -4):
+        clen = struct.unpack('I', data[i:i+4])[0]
+        if 0 < clen < 500:
+            break
+    else:
+        return None
+    start_i = i+4
+
+    if not(0 <= end-start_i - clen < 4):
+        newend = start_i + align4(clen)
+        print('Warning: actual len %d, expected %d, using %d' % (clen, end - start_i, newend - start_i))
+        end = newend
+
+    content = data[start_i:start_i+clen].decode('utf-8')
+    return start_i - 4, end, content
 
 
 def decompile():
@@ -211,6 +243,39 @@ def decompile():
 
     rad = AssetDecoder('resourceDB.dat', 'ResourceItem.cs', 292)
     rad.decode()
+
+    with open('blockDB.dat', 'rb') as f:
+        data = f.read()
+
+    agent_starts = []
+    i = 0
+    agent_needle = 'oneAdjacentNeighbor'.encode('utf-8')
+    first = True
+    while True:
+        i = data.find(agent_needle, i)
+        if i == -1:
+            break
+
+        agent_list_start = i - 8
+        lens = struct.unpack_from('II', data, agent_list_start)
+        if lens[1] != len(agent_needle) or lens[0] < 1 or lens[0] > 20:
+            print('Warning: weird lengths', lens)
+        else:
+            if first:
+                first = False
+            else:
+                # Find a run of printable characters before the agent list
+                descstart, descend, descstr = find_str(data, i-9)
+                namestart, nameend, namestr = find_by_int(data, descstart)
+
+                print('{namestr:25} '
+                      '{namestart:6} {nameend:6} '
+                      '{descstart:6} {descend:6} '
+                      '{agent_list_start:6}'
+                      .format(**locals()))
+
+        i += len(agent_needle)
+
     return
 
 
