@@ -156,7 +156,7 @@ def unpack_blocks(block_data, resource_data):
     agent_needle = 'oneAdjacentNeighbor'.encode('utf-8')
     first = True
 
-    blocks = []
+    blocks = {}
     while True:
         agent_str_start = block_data.find(agent_needle, agent_str_start)
         if agent_str_start == -1:
@@ -169,7 +169,10 @@ def unpack_blocks(block_data, resource_data):
         elif first:
             first = False
         else:
-            blocks.append(get_block(block_data, agent_list_start, rad.items))
+            block = get_block(block_data, agent_list_start, rad.items)
+            blocks[block.name] = block
 
         agent_str_start += len(agent_needle)
-    return sorted(blocks, key=lambda b: b.name), rad.items
+
+    return (sorted(blocks.values(), key=lambda b: b.name),
+            sorted(rad.items, key=lambda r: r['alias']))
