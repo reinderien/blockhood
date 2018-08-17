@@ -11,6 +11,11 @@ def main():
     dbs = search_asset_file(r'D:\Program Files\SteamLibrary\steamapps\common'
                             r'\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets',
                             (block_db, resource_db))
+    block_db = dbs[block_db]
+    resource_db = dbs[resource_db]
+    assert(block_db['name'] == 'blockDB_current')
+    assert(resource_db['name'] == 'resourceDB')
+
     blocks, resources = unpack_blocks()
     analyse(blocks, resources)
     return

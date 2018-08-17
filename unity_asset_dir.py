@@ -1,8 +1,8 @@
-from io import BytesIO, SEEK_CUR
+from io import BytesIO, SEEK_CUR, SEEK_SET
 from struct import unpack
 
 # Unity asset directory file
-# See https://github.com/Perfare/AssetStudio/blob/master/AssetStudio/StudioClasses/AssetsFile.cs
+# See https://github.com/Perfare/AssetStudio
 
 
 MONO_BEHAVIOUR = 114
@@ -54,9 +54,7 @@ def get_preload_table(f, class_ids, paths_to_search, data_offset):
 
         if path_id in paths_to_search:
             preload_table[path_id] = {'offset': offset + data_offset,
-                                      'size': size,
-                                      'type1': type1,
-                                      'type2': type2}
+                                      'size': size, 'type1': type1, 'type2': type2}
     return preload_table
 
 
@@ -69,7 +67,7 @@ def consume_prio_preload(f):
 
 
 def get_shared_assets(f):
-    shared_file_count = unpack('I', f.read(4))[0]
+    shared_file_count = f_int(f)
     shared_assets = []
     for _ in range(shared_file_count):
         aname = str_to_nul(f)
@@ -77,6 +75,31 @@ def get_shared_assets(f):
         shared_assets.append({'aname': aname,
                               'file_name': str_to_nul(f)})
     return shared_assets
+
+
+def get_shared(f, shared_assets):
+    file_id, path_id = unpack('<IQ', f.read(12))
+    if 0 <= file_id < len(shared_assets):
+        shared = shared_assets[file_id]
+    else:
+        shared = None
+    return {'file_id': file_id, 'path_id': path_id, 'shared': shared}
+
+
+def load_mono_behaviour(f, preload_table, shared_assets):
+    for path_id, asset in preload_table.items():
+        assert (asset['type2'] == MONO_BEHAVIOUR)  # Only type supported here
+        f.seek(asset['offset'], SEEK_SET)
+
+        game_obj = get_shared(f, shared_assets)
+        enabled = bool(f.read(1)[0])
+        assert enabled
+        align4(f)
+        script = get_shared(f, shared_assets)
+
+        asset.update({'name': f.read(f_int(f)).decode('utf-8'),
+                      'game_obj': game_obj,
+                      'script': script})
 
 
 def search_asset_file(fn, paths_to_search):
@@ -95,5 +118,6 @@ def search_asset_file(fn, paths_to_search):
         preload_table = get_preload_table(f, class_ids, paths_to_search, data_offset)
         consume_prio_preload(f)
         shared_assets = get_shared_assets(f)
+        load_mono_behaviour(f, preload_table, shared_assets)
 
     return preload_table
