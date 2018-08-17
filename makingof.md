@@ -170,8 +170,44 @@ strings, and decode the database.
 Analysis
 --------
 
-Then, it does some caching and data munging, for eventual processing by
+Once the data acquisition is complete, processing is done by
 [Numpy](http://www.numpy.org)/[Scipy](https://scipy.org).
-The eventual goal is to apply a
-[Dantzig linear programming solver](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linprog.html)
+It applies a 
+[Dantzig simplex solver](https://en.wikipedia.org/wiki/Simplex_algorithm)
+using the
+[linprog function](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linprog.html)
 to explore some optimal consumption patterns.
+
+One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
+solutions back that have fractional block counts:
+
+    Loading game databases...
+    Loaded blockDB_current 785kiB, resourceDB 71kiB.
+    
+    Unpacking resource database...
+    78 resources.
+    
+    Unpacking block database...
+    231 blocks.
+    
+    Calculating resource rates...
+    Calculating a solution for the zero-footprint challenge...
+    Iterations: 22
+    Optimization terminated successfully.
+    
+    Block                      Count
+    BEECH TREE GROVE           169.9
+    BLOCK'HOME                   0.2
+    CEMETERY                    13.9
+    GEOTHERMAL GENERATOR         1.0
+    TRAILER                      4.3
+    WATER TOWER                 10.8
+    
+    Resource            Mand      Opt
+    COMMUNITY         +13.88    +0.00
+    FERTILIZER        +30.04    +0.00
+    FRESH AIR        +593.56    +0.00
+    GREENHOUSE GAS     +0.10  -509.69
+    LEISURE           +83.87    +0.00
+    SICKNESS           +0.00   -41.64
+    WILDERNESS       +509.69    +0.00

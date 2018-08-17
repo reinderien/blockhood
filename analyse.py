@@ -40,7 +40,6 @@ def get_c(rates_no_opt, rates_opt, res_inds):
 
 def show(res, blocks, resources, rates_no_opt, rates_opt):
     print('Iterations:', res.nit)
-    print('Status code:', res.status)
     print(res.message)
     print()
 
@@ -94,4 +93,5 @@ def analyse(blocks, resources):
     bub = np.append(bub, np.array(200, ndmin=2), 0)
 
     res = linprog(c=c, A_ub=Aub, b_ub=bub)
+    assert(res.status == 0)
     show(res, blocks, resources, rates_no_opt, rates_opt)

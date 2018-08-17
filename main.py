@@ -6,6 +6,7 @@ from unity_unpack import unpack_blocks
 
 
 def main():
+    print('Loading game databases...')
     block_db = 21228
     resource_db = 21231
     dbs = search_asset_file(r'D:\Program Files\SteamLibrary\steamapps\common'
@@ -13,6 +14,9 @@ def main():
                             (block_db, resource_db))
     block_db = dbs[block_db]
     resource_db = dbs[resource_db]
+    print('Loaded %s %dkiB, %s %dkiB.' % (block_db['name'], block_db['size']/1024,
+                                         resource_db['name'], resource_db['size']/1024))
+    print()
     assert(block_db['name'] == 'blockDB_current')
     assert(resource_db['name'] == 'resourceDB')
 

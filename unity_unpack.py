@@ -147,11 +147,13 @@ def get_block(data, agent_list_start, rad_items):
 
 
 def unpack_blocks(block_data, resource_data):
-    print('Loading resource database...')
+    print('Unpacking resource database...')
     rad = AssetDecoder(resource_data, 'ResourceItem.cs', 248)
     rad.decode()
+    print('%d resources.' % len(rad.items))
+    print()
 
-    print('Loading block database...')
+    print('Unpacking block database...')
     agent_str_start = 0
     agent_needle = 'oneAdjacentNeighbor'.encode('utf-8')
     first = True
@@ -173,6 +175,8 @@ def unpack_blocks(block_data, resource_data):
             blocks[block.name] = block
 
         agent_str_start += len(agent_needle)
+    print('%d blocks.' % len(blocks))
+    print()
 
     return (sorted(blocks.values(), key=lambda b: b.name),
             sorted(rad.items, key=lambda r: r['alias']))
