@@ -116,8 +116,12 @@ Using the somewhat-sketchy-looking and unhelpfully closed-source
     Path ID: 21231
     Size:    73240 bytes
 
-Do a binary export of that file and it gets us something that appears to be a 32-bit-aligned serialized C# object. The
-strings are UTF-8-encoded, which is particularly important for the text in international languages.
+Do a binary export of those two databases. That can be done manually using UABE, but it's better to do it on-the-fly
+using asset decoding logic translated from
+[AssetStudio](https://github.com/Perfare/AssetStudio).
+ 
+Once you have the binary database data, it that appears to be a 32-bit-aligned serialized C# object. The strings are
+UTF-8-encoded, which is particularly important for the text in international languages.
 
 The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompiler). The classes of interest are:
 
@@ -155,9 +159,9 @@ The type assembly can be loaded in [DotPeek](https://www.jetbrains.com/decompile
   because the database dump does not use that format
 - The Unity deserialization code is probably in an unmanaged assembly to which this assembly refers using `extern`
 
-Looking at the binary resource database dump file in a hex editor, it's fairly easy to line up the binary fields with
-those shown in the decompiled model class. The integers and floats are in standard IEEE format, and the strings are
-non-terminated and preceded by length.
+Looking at the binary resource database in a hex editor, it's fairly easy to line up the binary fields with those shown
+in the decompiled model class. The integers and floats are in standard IEEE format, and the strings are non-terminated
+and preceded by length.
 
 The block database is screwier. Some of the same format elements are used, but the members are out of order. However,
 the member order is the same across each `Block` record. As such, a heuristic approach can find certain well-known
