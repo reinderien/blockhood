@@ -5,6 +5,13 @@ from unity_asset_dir import search_asset_file
 from unity_unpack import unpack_blocks
 
 
+def trim(blocks):
+    unavailable = {'TRAILER', "BLOCK'HOME", 'BLOKCORP HQ'}
+    for u in unavailable:
+        i = next(i for i, b in enumerate(blocks) if b.name == u)
+        del blocks[i]
+
+
 def main():
     print('Loading game databases...')
     block_db = 21228
@@ -21,6 +28,7 @@ def main():
     assert(resource_db['name'] == 'resourceDB')
 
     blocks, resources = unpack_blocks(block_db['data'], resource_db['data'])
+    trim(blocks)
     analyse(blocks, resources)
 
 

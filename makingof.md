@@ -192,22 +192,32 @@ solutions back that have fractional block counts:
     
     Calculating resource rates...
     Calculating a solution for the zero-footprint challenge...
-    Iterations: 22
+    Iterations: 134
     Optimization terminated successfully.
     
     Block                      Count
-    BEECH TREE GROVE           169.9
-    BLOCK'HOME                   0.2
-    CEMETERY                    13.9
-    GEOTHERMAL GENERATOR         1.0
-    TRAILER                      4.3
-    WATER TOWER                 10.8
+    ALGAE FARM                   0.9
+    BEECH TREE GROVE            84.8
+    BIOMASS GENERATOR            2.7
+    BOTANICAL GARDEN             4.8
+    FISH FARM                    0.8
+    MARKET                       1.1
+    PLANTERS                     0.8
+    SHACK I                      0.3
+    SMALL APT                    2.1
+    SPRINKLERS                  59.3
+    TREEHOUSE                    4.4
+    WATER TOWER                 11.9
+    WETLAND                     23.9
+    YOGA STUDIO                  2.2
     
     Resource            Mand      Opt
-    COMMUNITY         +13.88    +0.00
-    FERTILIZER        +30.04    +0.00
-    FRESH AIR        +593.56    +0.00
-    GREENHOUSE GAS     +0.10  -509.69
-    LEISURE           +83.87    +0.00
-    SICKNESS           +0.00   -41.64
-    WILDERNESS       +509.69    +0.00
+    FERTILIZER        +17.90    +0.00
+    FITNESS            +8.76    +0.00
+    FRESH AIR        +263.45    +0.00
+    GREENHOUSE GAS     +0.00  -255.16
+    ORGANIC WASTE      +0.00   -47.83
+    RISK               +0.54    +0.00
+    TOURIST            +9.56    +0.00
+    WILDERNESS       +278.20   -14.34
+    YOUTH             +30.73    +0.00
