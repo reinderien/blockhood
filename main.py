@@ -16,7 +16,7 @@ def main():
     assert(block_db['name'] == 'blockDB_current')
     assert(resource_db['name'] == 'resourceDB')
 
-    blocks, resources = unpack_blocks()
+    blocks, resources = unpack_blocks(block_db['data'], resource_db['data'])
     analyse(blocks, resources)
     return
 

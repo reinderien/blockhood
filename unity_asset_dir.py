@@ -96,10 +96,12 @@ def load_mono_behaviour(f, preload_table, shared_assets):
         assert enabled
         align4(f)
         script = get_shared(f, shared_assets)
+        name = f.read(f_int(f)).decode('utf-8')
+        align4(f)
+        main_size = asset['size'] - (f.tell() - asset['offset'])
 
-        asset.update({'name': f.read(f_int(f)).decode('utf-8'),
-                      'game_obj': game_obj,
-                      'script': script})
+        asset.update({'name': name, 'game_obj': game_obj, 'script': script,
+                      'data': f.read(main_size)})
 
 
 def search_asset_file(fn, paths_to_search):

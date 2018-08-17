@@ -8,8 +8,8 @@ Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_
 
 
 class AssetDecoder:
-    def __init__(self, db_fn, source_fn, first_offset):
-        self.f = open(db_fn, 'rb')
+    def __init__(self, data, source_fn, first_offset):
+        self.f = BytesIO(data)
         self.f.seek(first_offset, SEEK_SET)
         self.items = []
 
@@ -146,33 +146,30 @@ def get_block(data, agent_list_start, rad_items):
                       {n: a for n, a in zip(optional_input_names, optional_input_amounts)})
 
 
-def unpack_blocks():
+def unpack_blocks(block_data, resource_data):
     print('Loading resource database...')
-    rad = AssetDecoder('resourceDB.dat', 'ResourceItem.cs', 292)
+    rad = AssetDecoder(resource_data, 'ResourceItem.cs', 248)
     rad.decode()
 
     print('Loading block database...')
-    with open('blockDB.dat', 'rb') as f:
-        data = f.read()
-
     agent_str_start = 0
     agent_needle = 'oneAdjacentNeighbor'.encode('utf-8')
     first = True
 
     blocks = []
     while True:
-        agent_str_start = data.find(agent_needle, agent_str_start)
+        agent_str_start = block_data.find(agent_needle, agent_str_start)
         if agent_str_start == -1:
             break
 
         agent_list_start = agent_str_start - 8
-        lens = unpack_from('II', data, agent_list_start)
+        lens = unpack_from('II', block_data, agent_list_start)
         if lens[1] != len(agent_needle) or lens[0] < 1 or lens[0] > 20:
             print('Warning: weird lengths', lens)
         elif first:
             first = False
         else:
-            blocks.append(get_block(data, agent_list_start, rad.items))
+            blocks.append(get_block(block_data, agent_list_start, rad.items))
 
         agent_str_start += len(agent_needle)
     return sorted(blocks, key=lambda b: b.name), rad.items
