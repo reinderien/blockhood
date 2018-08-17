@@ -18,7 +18,6 @@ def main():
 
     blocks, resources = unpack_blocks(block_db['data'], resource_db['data'])
     analyse(blocks, resources)
-    return
 
 
 main()
