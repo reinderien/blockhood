@@ -96,6 +96,9 @@ Using the tool from the older Unity 5.6.2 gets farther, producing:
 
 Still useless.
 
+There's a fairly extensive-looking of asset decoder projects on
+[ZenHax](http://zenhax.com/viewtopic.php?f=9&t=12).
+
 Using the somewhat-sketchy-looking and unhelpfully closed-source
 [UABE](https://github.com/DerPopo/UABE),
  it apparently successfully decodes the .assets bundle. In the list it presents, we ignore graphics and audio items, and

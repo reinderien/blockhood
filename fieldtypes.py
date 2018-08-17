@@ -1,5 +1,3 @@
-import re
-from collections import namedtuple
 from io import SEEK_CUR
 from struct import unpack
 
@@ -95,42 +93,3 @@ class List(FieldType):
     def read(self, f):
         list_len = _read_int(f)
         return tuple(self.inner.read(f) for _ in range(list_len))
-
-
-Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_name', 'field_type'))
-
-
-def get_types(src):
-    types = {n: t()
-             for t in (Int, Float, Bool, String, AssetRef, GameObject, Vector3)
-             for n in t.names}
-
-    enum_re = re.compile(r'\s*public enum (\S+)$', re.M)
-    for tm in enum_re.finditer(src):
-        type_name = tm.group(1)
-        start = tm.start(1)
-        end = src.index('}', start)
-        val_src = src[start:end]
-        vals = tuple(m[1] for m in
-                     re.finditer(r'\s*(\S+),$', val_src, re.M))
-        types[type_name] = Enum(vals)
-
-    list_re = re.compile(r'(List<([^<>]+)>)|'
-                         r'(\S+)\[\]', re.M)
-    for tm in list_re.finditer(src):
-        inner = types[tm[2] or tm[3]]
-        types[tm[0]] = List(inner)
-
-    return types
-
-
-def get_members(src):
-    types = get_types(src)
-
-    mbr_re = re.compile(r'^\s*(public|private)'
-                        r'\s+(\S+)' 
-                        r'\s+(\S+)(;| =)', re.M)
-    for field_index, m in enumerate(mbr_re.finditer(src, re.M)):
-        access, type_name, field_name = m.groups()[:3]
-        field_type = types[type_name]
-        yield Member(field_index, access, type_name, field_name, field_type)
