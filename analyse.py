@@ -29,13 +29,19 @@ def get_rates(blocks, res_inds, nr):
 def get_c(rates_no_opt, rates_opt, res_inds):
     # Calculate c: sum opt and no_opt to eliminate resources dimension
     air_index = res_inds['FRESH AIR']
-    air_weight = -1
+    wild_index = res_inds['WILDERNESS']
 
-    rates_no_opt_air = np.copy(rates_no_opt)
-    rates_no_opt_air[air_index, :] *= air_weight
-    rates_opt_air = np.copy(rates_opt)
-    rates_opt_air[air_index, :] *= air_weight
-    return np.sum(rates_opt_air, 0) + np.sum(rates_no_opt_air, 0)
+    # Fresh air counts against cost, not toward it
+    rates_no_opt_c = np.copy(rates_no_opt)
+    rates_no_opt_c[air_index, :] *= -1
+    rates_opt_c = np.copy(rates_opt)
+    rates_opt_c[air_index, :] *= -1
+
+    # Apparently wilderness does not count toward or against us as a resource
+    rates_no_opt_c[wild_index, :] = 0
+    rates_opt_c[wild_index, :] = 0
+
+    return np.sum(rates_opt_c, 0) + np.sum(rates_no_opt_c, 0)
 
 
 def show(res, blocks, resources, rates_no_opt, rates_opt):

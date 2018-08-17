@@ -192,32 +192,35 @@ solutions back that have fractional block counts:
     
     Calculating resource rates...
     Calculating a solution for the zero-footprint challenge...
-    Iterations: 134
+    Iterations: 83
     Optimization terminated successfully.
     
     Block                      Count
-    ALGAE FARM                   0.9
-    BEECH TREE GROVE            84.8
-    BIOMASS GENERATOR            2.7
-    BOTANICAL GARDEN             4.8
-    FISH FARM                    0.8
-    MARKET                       1.1
-    PLANTERS                     0.8
-    SHACK I                      0.3
-    SMALL APT                    2.1
-    SPRINKLERS                  59.3
+    ALGAE FARM                   0.6
+    BARBERSHOP                   0.3
+    BEECH TREE GROVE            88.3
+    BIOMASS GENERATOR            2.9
+    CORP. OFFICE                 1.7
+    FISH FARM                    0.0
+    MARKET                       0.0
+    OIL WELL                     0.4
+    PLANTERS                     0.0
+    SCHOOL                       0.3
+    SHACK I                      1.1
+    SMALL APT                    0.3
+    SPRINKLERS                  61.4
     TREEHOUSE                    4.4
-    WATER TOWER                 11.9
-    WETLAND                     23.9
-    YOGA STUDIO                  2.2
+    WASTE SORTING CENTER         0.6
+    WATER TOWER                 10.6
+    WETLAND                     27.0
     
     Resource            Mand      Opt
-    FERTILIZER        +17.90    +0.00
-    FITNESS            +8.76    +0.00
-    FRESH AIR        +263.45    +0.00
-    GREENHOUSE GAS     +0.00  -255.16
-    ORGANIC WASTE      +0.00   -47.83
-    RISK               +0.54    +0.00
-    TOURIST            +9.56    +0.00
-    WILDERNESS       +278.20   -14.34
-    YOUTH             +30.73    +0.00
+    FERTILIZER        +29.93    +0.00
+    FRESH AIR        +264.82    +0.00
+    GREENHOUSE GAS     +0.43  -265.44
+    ORGANIC WASTE      -0.00   -53.95
+    RISK               +2.17    -1.05
+    ROASTED COFFEE     +0.00    -2.55
+    SORTED WASTE       +5.11    +0.00
+    WILDERNESS       +291.79    +0.00
+    YOUTH             +28.52    +0.00
