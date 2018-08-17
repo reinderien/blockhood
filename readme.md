@@ -8,4 +8,5 @@ is a city-building game by Jose Sanchez of the
 
 I'm unaffiliated. I bought and enjoy the game, so I wrote this application to do some analysis on its economic model.
 
-For details of the development process, see makingof.
+For details of the development process, see
+[making of](https://github.com/reinderien/blockhood/blob/master/makingof.md).
