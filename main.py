@@ -6,7 +6,7 @@ from unity_unpack import unpack_blocks
 
 
 def trim(blocks):
-    unavailable = {'TRAILER', "BLOCK'HOME", 'BLOKCORP HQ'}
+    unavailable = {'TRAILER', "BLOCK'HOME", 'BLOKCORP HQ', 'TREEHOUSE'}
     for u in unavailable:
         i = next(i for i, b in enumerate(blocks) if b.name == u)
         del blocks[i]

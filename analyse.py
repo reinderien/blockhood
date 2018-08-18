@@ -26,10 +26,8 @@ def get_rates(blocks, res_inds, nr):
     return rates_no_opt, rates_opt
 
 
-def get_c(rates_no_opt, rates_opt, res_inds):
+def get_c(rates_no_opt, rates_opt, air_index, wild_index):
     # Calculate c: sum opt and no_opt to eliminate resources dimension
-    air_index = res_inds['FRESH AIR']
-    wild_index = res_inds['WILDERNESS']
 
     # Fresh air counts against cost, not toward it
     rates_no_opt_c = np.copy(rates_no_opt)
@@ -44,22 +42,49 @@ def get_c(rates_no_opt, rates_opt, res_inds):
     return np.sum(rates_opt_c, 0) + np.sum(rates_no_opt_c, 0)
 
 
+def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb):
+    a_lower_rates = rates_no_opt       # Only mandatory rates influence minima
+    b_lower_rates = np.zeros((nr, 1))  # Minimum rate for most resources is 0
+    b_lower_rates[air_index] = 500     # Lowest fresh air allowable
+    b_lower_rates[money_index] = -150  # Lowest rate of money - left with nothing
+
+    a_upper_rates = rates_no_opt + rates_opt  # Allow opt inputs to help rate maxima
+    b_upper_rates = np.full((nr, 1), 80)      # Upper rate for most resources is 80
+    b_upper_rates[money_index] -= 150         # Most amount of money left at end is 80
+
+    # Neither fresh air nor wilderness have maxima
+    a_upper_rates = np.delete(a_upper_rates, (air_index, wild_index), 0)
+    b_upper_rates = np.delete(b_upper_rates, (air_index, wild_index), 0)
+
+    a_upper_blocks = np.ones((1, nb))        # Count all blocks
+    b_upper_blocks = np.array(500, ndmin=2)  # Choose some reasonable maximum
+
+    # Lower bounds must be negated
+    a_upper = np.append(-a_lower_rates,
+              np.append(a_upper_rates, a_upper_blocks, 0), 0)
+    b_upper = np.append(-b_lower_rates,
+              np.append(b_upper_rates, b_upper_blocks, 0), 0)
+    return a_upper, b_upper
+
+
 def show(res, blocks, resources, rates_no_opt, rates_opt):
     print('Iterations:', res.nit)
     print(res.message)
     print()
+    if res.status != 0:
+        return
 
-    print('{:25s} {:>6s}'.format('Block', 'Count'))
-    print('\n'.join('{:25s} {:>6.1f}'.format(blocks[i].name, c)
+    print('{:20s} {:>6s}'.format('Block', 'Count'))
+    print('\n'.join('{:20s} {:>6.1f}'.format(blocks[i].name, c)
                     for i, c in enumerate(res.x)
-                    if c > 1e-3))
+                    if abs(c) >= 0.1))
     print()
 
     x = np.array(res.x, ndmin=2).T
     no_opt = np.matmul(rates_no_opt, x)
     opt = np.matmul(rates_opt, x)
     print('{:15s} {:>8s} {:>8s}'.format('Resource', 'Mand', 'Opt'))
-    print('\n'.join('{:15s} {:+8.2f} {:+8.2f}'
+    print('\n'.join('{:15s} {:8.2f} {:8.2f}'
                     .format(resources[i]['alias'], rn[0], ro[0])
                     for i, (rn, ro) in enumerate(zip(no_opt, opt))
                     if abs(rn) >= 1e-2 or abs(ro) >= 1e-2))
@@ -81,23 +106,20 @@ def analyse(blocks, resources):
 
     print('Calculating resource rates...')
     res_inds = {r['alias']: i for i, r in enumerate(resources)}
+    air_index = res_inds['FRESH AIR']
+    wild_index = res_inds['WILDERNESS']
+    money_index = res_inds['MONEY']
     nr, nb = len(resources), len(blocks)
     rates_no_opt, rates_opt = get_rates(blocks, res_inds, nr)
 
     print('Calculating a solution for the zero-footprint challenge...')
 
     # Generate as few resources as possible - except for fresh air, which should be maximized
-    c = get_c(rates_no_opt, rates_opt, res_inds)
+    c = get_c(rates_no_opt, rates_opt, air_index, wild_index)
 
-    # "upper bound of zero on mandatory negative resource generation"; i.e.
-    # mandatory resource rates cannot go below zero for a sustainable economy
-    Aub = -rates_no_opt
-    bub = np.zeros((nr, 1))
+    aub, bub = get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb)
 
-    # total block count should not exceed something reasonable
-    Aub = np.append(Aub, np.ones((1, nb)), 0)
-    bub = np.append(bub, np.array(200, ndmin=2), 0)
-
-    res = linprog(c=c, A_ub=Aub, b_ub=bub)
-    assert(res.status == 0)
+    # Interior point converges much faster for this problem than simplex, which isn't surprising considering that it
+    # "is intended to provide a faster and more reliable alternative to simplex, especially for large, sparse problems."
+    res = linprog(c=c, A_ub=aub, b_ub=bub, method='interior-point')
     show(res, blocks, resources, rates_no_opt, rates_opt)

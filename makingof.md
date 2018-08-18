@@ -173,7 +173,7 @@ Analysis
 Once the data acquisition is complete, processing is done by
 [Numpy](http://www.numpy.org)/[Scipy](https://scipy.org).
 It applies a 
-[Dantzig simplex solver](https://en.wikipedia.org/wiki/Simplex_algorithm)
+[MOSEK interior-point solver](https://en.wikipedia.org/wiki/Interior-point_method)
 using the
 [linprog function](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linprog.html)
 to explore some optimal consumption patterns.
