@@ -26,25 +26,15 @@ def get_rates(blocks, res_inds, nr):
     return rates_no_opt, rates_opt
 
 
-def get_c(rates_no_opt, rates_opt, air_index, wild_index):
-    # Calculate c: sum opt and no_opt to eliminate resources dimension
+def get_c(nb):
+    # Cost not based on resource generation (limits now take care of that), but block count
 
-    # Fresh air counts against cost, not toward it
-    rates_no_opt_c = np.copy(rates_no_opt)
-    rates_no_opt_c[air_index, :] *= -1
-    rates_opt_c = np.copy(rates_opt)
-    rates_opt_c[air_index, :] *= -1
-
-    # Apparently wilderness does not count toward or against us as a resource
-    rates_no_opt_c[wild_index, :] = 0
-    rates_opt_c[wild_index, :] = 0
-
-    return np.sum(rates_opt_c, 0) + np.sum(rates_no_opt_c, 0)
+    return np.ones((1, nb))
 
 
 def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb):
     min_air = 500
-    max_res = 50      # Actually 80 but let's be safe
+    max_res = 60      # Actually 80 but let's be safe
     init_money = 150
 
     a_lower_rates = rates_no_opt              # Only mandatory rates influence minima
@@ -60,14 +50,9 @@ def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, 
     a_upper_rates = np.delete(a_upper_rates, (air_index, wild_index), 0)
     b_upper_rates = np.delete(b_upper_rates, (air_index, wild_index), 0)
 
-    a_upper_blocks = np.ones((1, nb))        # Count all blocks
-    b_upper_blocks = np.array(500, ndmin=2)  # Choose some reasonable maximum
-
     # Lower bounds must be negated
-    a_upper = np.append(-a_lower_rates,
-              np.append(a_upper_rates, a_upper_blocks, 0), 0)
-    b_upper = np.append(-b_lower_rates,
-              np.append(b_upper_rates, b_upper_blocks, 0), 0)
+    a_upper = np.append(-a_lower_rates, a_upper_rates, 0)
+    b_upper = np.append(-b_lower_rates, b_upper_rates, 0)
     return a_upper, b_upper
 
 
@@ -78,13 +63,14 @@ def show(res, blocks, resources, rates_no_opt, rates_opt):
     if res.status != 0:
         return
 
+    x = res.x  # np.around(res.x)
     print('{:20s} {:>6s}'.format('Block', 'Count'))
     print('\n'.join('{:20s} {:>6.1f}'.format(blocks[i].name, c)
-                    for i, c in enumerate(res.x)
-                    if abs(c) >= 0.1))
+                    for i, c in enumerate(x)
+                    if c > 0.1))
     print()
 
-    x = np.array(res.x, ndmin=2).T
+    x = np.array(x, ndmin=2).T
     no_opt = np.matmul(rates_no_opt, x)
     opt = np.matmul(rates_opt, x)
     print('{:15s} {:>8s} {:>8s}'.format('Resource', 'Mand', 'Opt'))
@@ -118,7 +104,7 @@ def analyse(blocks, resources):
     rates_no_opt, rates_opt = get_rates(blocks, res_inds, nr)
 
     # Generate as few resources as possible - except for fresh air, which should be maximized
-    c = get_c(rates_no_opt, rates_opt, air_index, wild_index)
+    c = get_c(nb)
 
     aub, bub = get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb)
 
