@@ -184,30 +184,26 @@ solutions back that have fractional block counts:
     Loading game databases... Loaded blockDB_current 785kiB, resourceDB 71kiB.
     Unpacking resource database... 78 resources.
     Unpacking block database... 231 blocks.
+    Trimmed blocks: 5 unavailable, 40 equivalent.
     
     Calculating a solution for the zero-footprint challenge...
-    Iterations: 14
+    Iterations: 16
     Optimization terminated successfully.
     
     Block                 Count
-    ALGAE FARM              3.9
-    BEECH TREE GROVE      141.8
-    BIOMASS GENERATOR       8.5
-    CEMETERY               61.8
-    CORNER APT             30.9
-    CROSS SUPPORT          14.0
-    SPRINKLERS            142.8
-    WATER TOWER            26.6
-    WETLAND                69.8
+    BEECH TREE GROVE       57.5
+    BRISTLECONE PINE      133.7
+    GEOTHERMAL GENERATOR   15.2
+    HYBRID PARK I           2.5
+    SPRINKLERS            153.1
+    WATER TOWER            19.8
     
     Resource            Mand      Opt
-    COMMUNITY          61.75     0.00
-    FERTILIZER         78.33     0.00
-    FRESH AIR         536.13    -0.00
-    GREENHOUSE GAS      0.00  -429.11
-    LEISURE            80.00     0.00
-    MONEY             -70.00     0.00
-    ORGANIC WASTE      61.75  -139.60
-    SICKNESS            0.00  -185.25
-    WILDERNESS        495.05    -0.00
-    YOUTH              61.75     0.00
+    COMMUNITY           2.48     0.00
+    ELECTRICITY        60.00     0.00
+    FITNESS             2.48     0.00
+    FRESH AIR         500.00    -0.00
+    GREENHOUSE GAS      1.52  -172.57
+    LEISURE            60.00     0.00
+    MONEY             -90.00     0.00
+    WILDERNESS        306.29    -0.00
