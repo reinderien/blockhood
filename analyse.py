@@ -104,15 +104,14 @@ def analyse(blocks, resources):
     Block counts must not be negative: implied by default value of `bounds`
     """
 
-    print('Calculating resource rates...')
+    print('Calculating a solution for the zero-footprint challenge...')
+
     res_inds = {r['alias']: i for i, r in enumerate(resources)}
     air_index = res_inds['FRESH AIR']
     wild_index = res_inds['WILDERNESS']
     money_index = res_inds['MONEY']
     nr, nb = len(resources), len(blocks)
     rates_no_opt, rates_opt = get_rates(blocks, res_inds, nr)
-
-    print('Calculating a solution for the zero-footprint challenge...')
 
     # Generate as few resources as possible - except for fresh air, which should be maximized
     c = get_c(rates_no_opt, rates_opt, air_index, wild_index)

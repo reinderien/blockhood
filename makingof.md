@@ -181,46 +181,33 @@ to explore some optimal consumption patterns.
 One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
 solutions back that have fractional block counts:
 
-    Loading game databases...
-    Loaded blockDB_current 785kiB, resourceDB 71kiB.
+    Loading game databases... Loaded blockDB_current 785kiB, resourceDB 71kiB.
+    Unpacking resource database... 78 resources.
+    Unpacking block database... 231 blocks.
     
-    Unpacking resource database...
-    78 resources.
-    
-    Unpacking block database...
-    231 blocks.
-    
-    Calculating resource rates...
     Calculating a solution for the zero-footprint challenge...
-    Iterations: 83
+    Iterations: 14
     Optimization terminated successfully.
     
-    Block                      Count
-    ALGAE FARM                   0.6
-    BARBERSHOP                   0.3
-    BEECH TREE GROVE            88.3
-    BIOMASS GENERATOR            2.9
-    CORP. OFFICE                 1.7
-    FISH FARM                    0.0
-    MARKET                       0.0
-    OIL WELL                     0.4
-    PLANTERS                     0.0
-    SCHOOL                       0.3
-    SHACK I                      1.1
-    SMALL APT                    0.3
-    SPRINKLERS                  61.4
-    TREEHOUSE                    4.4
-    WASTE SORTING CENTER         0.6
-    WATER TOWER                 10.6
-    WETLAND                     27.0
+    Block                 Count
+    ALGAE FARM              3.9
+    BEECH TREE GROVE      141.8
+    BIOMASS GENERATOR       8.5
+    CEMETERY               61.8
+    CORNER APT             30.9
+    CROSS SUPPORT          14.0
+    SPRINKLERS            142.8
+    WATER TOWER            26.6
+    WETLAND                69.8
     
     Resource            Mand      Opt
-    FERTILIZER        +29.93    +0.00
-    FRESH AIR        +264.82    +0.00
-    GREENHOUSE GAS     +0.43  -265.44
-    ORGANIC WASTE      -0.00   -53.95
-    RISK               +2.17    -1.05
-    ROASTED COFFEE     +0.00    -2.55
-    SORTED WASTE       +5.11    +0.00
-    WILDERNESS       +291.79    +0.00
-    YOUTH             +28.52    +0.00
+    COMMUNITY          61.75     0.00
+    FERTILIZER         78.33     0.00
+    FRESH AIR         536.13    -0.00
+    GREENHOUSE GAS      0.00  -429.11
+    LEISURE            80.00     0.00
+    MONEY             -70.00     0.00
+    ORGANIC WASTE      61.75  -139.60
+    SICKNESS            0.00  -185.25
+    WILDERNESS        495.05    -0.00
+    YOUTH              61.75     0.00
