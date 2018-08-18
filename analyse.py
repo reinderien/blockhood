@@ -43,14 +43,18 @@ def get_c(rates_no_opt, rates_opt, air_index, wild_index):
 
 
 def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb):
-    a_lower_rates = rates_no_opt       # Only mandatory rates influence minima
-    b_lower_rates = np.zeros((nr, 1))  # Minimum rate for most resources is 0
-    b_lower_rates[air_index] = 500     # Lowest fresh air allowable
-    b_lower_rates[money_index] = -150  # Lowest rate of money - left with nothing
+    min_air = 500
+    max_res = 50      # Actually 80 but let's be safe
+    init_money = 150
 
-    a_upper_rates = rates_no_opt + rates_opt  # Allow opt inputs to help rate maxima
-    b_upper_rates = np.full((nr, 1), 80)      # Upper rate for most resources is 80
-    b_upper_rates[money_index] -= 150         # Most amount of money left at end is 80
+    a_lower_rates = rates_no_opt              # Only mandatory rates influence minima
+    b_lower_rates = np.zeros((nr, 1))         # Minimum rate for most resources is 0
+    b_lower_rates[air_index] = min_air        # Lowest fresh air allowable
+    b_lower_rates[money_index] = -init_money  # Lowest rate of money - left with nothing
+
+    a_upper_rates = rates_no_opt + rates_opt   # Allow opt inputs to help rate maxima
+    b_upper_rates = np.full((nr, 1), max_res)  # Upper rate for most resources is 80
+    b_upper_rates[money_index] -= init_money   # Most amount of money left at end is 80
 
     # Neither fresh air nor wilderness have maxima
     a_upper_rates = np.delete(a_upper_rates, (air_index, wild_index), 0)
