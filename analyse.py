@@ -36,6 +36,7 @@ def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, 
     min_air = 500
     max_res = 60      # Actually 80 but let's be safe
     init_money = 150
+    space_limit = 8*8*10
 
     a_lower_rates = rates_no_opt              # Only mandatory rates influence minima
     b_lower_rates = np.zeros((nr, 1))         # Minimum rate for most resources is 0
@@ -50,9 +51,17 @@ def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, 
     a_upper_rates = np.delete(a_upper_rates, (air_index, wild_index), 0)
     b_upper_rates = np.delete(b_upper_rates, (air_index, wild_index), 0)
 
+    # The map is an 8x8 x 10 grid. As such, there is an upper bound on the block count.
+    a_upper_count = np.ones((1, nb))
+    b_upper_count = np.array(space_limit, ndmin=2)
+
+    # Todo: make design realizable by including a minimum ratio of structural blocks
+
     # Lower bounds must be negated
-    a_upper = np.append(-a_lower_rates, a_upper_rates, 0)
-    b_upper = np.append(-b_lower_rates, b_upper_rates, 0)
+    a_upper = np.append(-a_lower_rates,
+              np.append(a_upper_rates, a_upper_count, 0), 0)
+    b_upper = np.append(-b_lower_rates,
+              np.append(b_upper_rates, b_upper_count, 0), 0)
     return a_upper, b_upper
 
 
