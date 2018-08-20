@@ -32,11 +32,13 @@ def get_c(nb):
     return np.ones((1, nb))
 
 
-def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb):
+def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, blocks, nr, nb):
     min_air = 500
     max_res = 60      # Actually 80 but let's be safe
-    init_money = 150
-    space_limit = 8*8*10
+    init_money = 150  # Needs to be below 80 at the end
+    max_area = 8**2
+    max_vol = max_area*10      # include height
+    struct_ratio = 4/max_area
 
     a_lower_rates = rates_no_opt              # Only mandatory rates influence minima
     b_lower_rates = np.zeros((nr, 1))         # Minimum rate for most resources is 0
@@ -53,15 +55,22 @@ def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, 
 
     # The map is an 8x8 x 10 grid. As such, there is an upper bound on the block count.
     a_upper_count = np.ones((1, nb))
-    b_upper_count = np.array(space_limit, ndmin=2)
+    b_upper_count = np.array(max_vol, ndmin=2)
 
-    # Todo: make design realizable by including a minimum ratio of structural blocks
+    # Make design realizable by including a minimum ratio of structural blocks
+    # If Σstruct >= μΣtotal, then
+    # (1 - μ)Σstruct - μΣnonstruct >= 0
+    a_lower_struct = np.array(tuple(1 - struct_ratio if b['allowUpper'] else -struct_ratio
+                                    for b in blocks), ndmin=2)
+    b_lower_struct = np.zeros((1, 1))
 
     # Lower bounds must be negated
     a_upper = np.append(-a_lower_rates,
-              np.append(a_upper_rates, a_upper_count, 0), 0)
+              np.append(-a_lower_struct,
+              np.append(a_upper_rates, a_upper_count, 0), 0), 0)
     b_upper = np.append(-b_lower_rates,
-              np.append(b_upper_rates, b_upper_count, 0), 0)
+              np.append(-b_lower_struct,
+              np.append(b_upper_rates, b_upper_count, 0), 0), 0)
     return a_upper, b_upper
 
 
@@ -115,7 +124,7 @@ def analyse(blocks, resources):
     # Generate as few resources as possible - except for fresh air, which should be maximized
     c = get_c(nb)
 
-    aub, bub = get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, nr, nb)
+    aub, bub = get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, blocks, nr, nb)
 
     # Interior point converges much faster for this problem than simplex, which isn't surprising considering that it
     # "is intended to provide a faster and more reliable alternative to simplex, especially for large, sparse problems."

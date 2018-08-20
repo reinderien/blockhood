@@ -1,3 +1,6 @@
+Block'Hood Balance Analysis
+===========================
+
 Inspiration
 -----------
 
@@ -42,6 +45,8 @@ It's terse and has tonnes of third-party libraries.
 Data Acquisition
 ----------------
 
+### Web scraping
+
 To analyse this economy, the application needs a complete representation of all buildings and what they produce and
 consume at what rates. To do this, I originally pulled from the community-maintained
 [wiki](https://blockhood.gamepedia.com).
@@ -58,6 +63,8 @@ But there's a problem. Many of the pages are
 by hand, so I
 [asked the developer for some data](https://www.facebook.com/blockhoodgame/posts/1877621299022835)
 but haven't heard back.
+
+### Game database
 
 Second approach: scrape the game itself. Based on a dumb directory search, the data live in this file:
 
@@ -179,31 +186,79 @@ using the
 to explore some optimal consumption patterns.
 
 One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
-solutions back that have fractional block counts:
+solutions back that have fractional block counts.
+
+### Variables
+
+This solver is essentially regulated by two equations, `Minimize c⋅x` and `A⋅x ≤ b`, where
+
+- `nr` and `nb` are the resource type count and block type count, respectively
+- `x` is an `nb`×1 column of block counts, the independent variable scipy is optimizing.
+- `c` is a 1×`nb` row of block count weights, representing the cost coefficients for each block. Currently these are all
+  set to 1 such that we simply optimize for the solution with the fewest blocks. When `c` and `x` are multiplied during
+  optimization, scipy gets a number that is called the value of the objective function. In our case that's equal to the
+  block count.
+- `A` and `b` control bounds. `A` is a many × `nb` matrix, and `b` is a many × 1 column.
+
+### Bounds
+
+Most of the work in setting up this problem goes toward choosing good bounds. `A` and `b` must be of equal height, and
+an arbitrary number of corresponding boundary rows can be added to each. In the scipy implementation only an upper bound
+is provided, so lower bounds must be represented as negative upper bounds.
+
+The implemented bounds assume that the time period for solution is effectively 1, so that the resource production rates
+and resource end amounts are equal. In reality the end amount would scale based on time.
+
+- No resource production rate may be negative, or else the economy will be unsustainable.
+- No resource production rate may exceed 80; that's the maximum given by the challenge.
+- As exceptions to the above,
+    - The wilderness rate has no upper bound because that's an (unstated) mechanism of the challenge.
+    - The amount of money starts at 150, not 0 as with all other resources. As such, the money rate must be negative,
+      and between -150 and -70 such that the end amount of money is between 0 and 80.
+    - The minimum fresh air rate is 500 as in the challenge. There is no maximum.
+- There is a finite amount of space. The board is 8×8, with up to 10 blocks in the air. As such, there is a maximum
+  block count of 640.
+- Not all blocks support building above them (`allowUpper`). For any solution that has above 64 blocks, there must be
+  sufficient structural blocks to support upper levels. Currently there is a minimum of 4 structural blocks per story.
+
+### Output
+
+A current example of the output is:
 
     Loading game databases... Loaded blockDB_current 785kiB, resourceDB 71kiB.
     Unpacking resource database... 78 resources.
-    Unpacking block database... 231 blocks.
-    Trimmed blocks: 5 unavailable, 40 equivalent.
+    Unpacking block database... 241 blocks.
+    Trimmed blocks: 45 unavailable, 23 equivalent.
     
     Calculating a solution for the zero-footprint challenge...
-    Iterations: 16
+    Iterations: 13
     Optimization terminated successfully.
     
     Block                 Count
-    BEECH TREE GROVE       57.5
-    BRISTLECONE PINE      133.7
-    GEOTHERMAL GENERATOR   15.2
-    HYBRID PARK I           2.5
-    SPRINKLERS            153.1
-    WATER TOWER            19.8
+    BEECH TREE GROVE       36.0
+    BOTANICAL GARDEN       30.0
+    BRISTLECONE PINE      139.0
+    GEOTHERMAL GENERATOR   10.0
+    LARGE APT              12.0
+    SHACK I                 6.0
+    SOIL                    6.4
+    SPRINKLERS             64.2
+    WATER TOWER            30.0
+    WETLAND                56.2
     
     Resource            Mand      Opt
-    COMMUNITY           2.48     0.00
-    ELECTRICITY        60.00     0.00
-    FITNESS             2.48     0.00
+    ALGAE              56.16     0.00
+    COMMUNITY          54.00     0.00
+    CONSUMER           60.00     0.00
+    ELECTRICITY        45.68     0.00
+    FERTILIZER          2.51     0.00
     FRESH AIR         500.00    -0.00
-    GREENHOUSE GAS      1.52  -172.57
+    GREENHOUSE GAS      1.00  -108.00
+    GREYWATER          60.00    -0.00
     LEISURE            60.00     0.00
     MONEY             -90.00     0.00
-    WILDERNESS        306.29    -0.00
+    ORGANIC WASTE      60.00  -118.67
+    RISK               12.00    -0.00
+    TOURIST            60.00     0.00
+    WILDERNESS        303.16   -90.00
+    YOUTH              36.00     0.00
