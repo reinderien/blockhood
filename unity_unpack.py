@@ -177,14 +177,18 @@ def unpack_blocks(block_data, resource_data):
                 first = False
             else:
                 block_sects = get_block_sections(block_data, agent_list_start)
-                blocks.append(bad.decode_one(block_sects))
+                block = bad.decode_one(block_sects)
+
+                # This is a straight-up error in the data
+                if not (block['toolTipHeader'] == 'WETLAND' and block['myName'] == 'T Old Cactus'):
+                    blocks.append(block)
 
             agent_str_start += len(agent_needle)
 
     for b in blocks:
         for kn in ('inputs', 'outputs', 'optionalInputs'):
             ka = kn + 'Amounts'
-            b[kn] = {rad.items[n+1]['alias']: round(a, 8)  # Deal with single-to-double error
+            b[kn] = {rad.items[n-1]['alias']: round(a, 8)  # Deal with single-to-double error
                      for n, a in zip(b[kn], b[ka])}
 
     print('%d blocks.' % len(blocks))

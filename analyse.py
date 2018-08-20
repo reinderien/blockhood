@@ -74,7 +74,7 @@ def show(res, blocks, resources, rates_no_opt, rates_opt):
 
     x = res.x  # np.around(res.x)
     print('{:20s} {:>6s}'.format('Block', 'Count'))
-    print('\n'.join('{:20s} {:>6.1f}'.format(blocks[i].name, c)
+    print('\n'.join('{:20s} {:>6.1f}'.format(blocks[i]['toolTipHeader'], c)
                     for i, c in enumerate(x)
                     if c > 0.1))
     print()

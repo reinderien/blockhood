@@ -19,8 +19,7 @@ def trim(blocks):
     while True:
         try:
             i = next(i for i, b in enumerate(blocks)
-                     if  # b['category'] == 'WILD_TILES' or b['toolTipHeader'] == 'CANAL BRIDGE')
-                     b['toolTipHeader'] in {'TRAILER', "BLOCK'HOME", 'BLOKCORP HQ', 'TREEHOUSE', 'CANAL BRIDGE'})
+                     if b['category'] == 'WILD_TILES' or b['toolTipHeader'] == 'CANAL BRIDGE')
         except StopIteration:
             break
         del blocks[i]
