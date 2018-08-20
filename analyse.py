@@ -10,11 +10,11 @@ def get_rates(blocks, res_inds, nr):
         nocol = np.zeros((nr, 1))             # Column of mandatory rates for this block
         opcol = np.zeros((nr, 1))             # Column of optional rates for this block
 
-        for res, qty in block.inputs.items():
+        for res, qty in block['inputs'].items():
             nocol[res_inds[res]] -= qty
-        for res, qty in block.opt_inputs.items():
+        for res, qty in block['optionalInputs'].items():
             opcol[res_inds[res]] -= qty
-        for res, qty in block.outputs.items():
+        for res, qty in block['outputs'].items():
             if qty < 0:
                 col = opcol
             else:

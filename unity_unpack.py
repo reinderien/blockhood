@@ -8,8 +8,8 @@ Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_
 
 
 class AssetDecoder:
-    def __init__(self, data, source_fn, first_offset):
-        self.f = BytesIO(data)
+    def __init__(self, f, source_fn, first_offset):
+        self.f = f
         self.f.seek(first_offset, SEEK_SET)
         self.items = []
 
@@ -27,6 +27,26 @@ class AssetDecoder:
                     return
                 item[field.field_name] = val
             self.items.append(item)
+
+
+class JumbledAssetDecoder(AssetDecoder):
+    def __init__(self, f, source_fn, first_offset):
+        super().__init__(f, source_fn, first_offset)
+
+    def decode_one(self, sections):
+        item = {}
+        for off, mbr_first, mbr_last in sections:
+            if off < 0:  # relative
+                self.f.seek(-off, SEEK_CUR)
+            else:
+                self.f.seek(off, SEEK_SET)
+            mbr_i = next(i for i,m in enumerate(self.mbrs) if m.field_name == mbr_first)
+            mbr_j = mbr_i + 1 + next(j for j,m in enumerate(self.mbrs[mbr_i:]) if m.field_name == mbr_last)
+            for mbr in self.mbrs[mbr_i:mbr_j]:
+                before_fail_pos = self.f.tell()
+                val = mbr.field_type.read(self.f)
+                item[mbr.field_name] = val
+        return item
 
 
 def get_types(src):
@@ -107,19 +127,7 @@ def find_by_int(data, end):
     return start_i - 4, end, content
 
 
-BlockRates = namedtuple('BlockRates', ('name', 'inputs', 'outputs', 'opt_inputs'))
-
-t_bool, t_int, t_float = Bool(), Int(), Float()
-t_int_list, t_float_list = List(t_int), List(t_float)
-
-
-def get_block(data, agent_list_start, rad_items):
-    def read_res():
-        return (rad_items[i - 1]['alias'] for i in t_int_list.read(rate_sect))
-
-    def read_rate():
-        return t_float_list.read(rate_sect)
-
+def get_block_sections(data, agent_list_start):
     # Find a run of printable characters before the agent list
     descstart, descend, descstr = find_str(data, agent_list_start)
 
@@ -130,26 +138,22 @@ def get_block(data, agent_list_start, rad_items):
     else:
         namestart, nameend, namestr = find_by_int(data, descstart)
 
-    rate_sect = BytesIO(data[descend: agent_list_start])
-    t_bool.read(rate_sect)  # connect
-    assert (t_int.read(rate_sect) == 0)  # junk
-    t_int.read(rate_sect)  # distanceToStreet
-    assert (t_int.read(rate_sect) == 0)  # junk
+    is_walkable_start = namestart - 92
+    my_name_start, my_name_end, my_name_str = find_by_int(data, is_walkable_start)
+    block_to_copy_start = my_name_start - 24
 
-    input_names, output_names = read_res(), read_res()
-    input_amounts, output_amounts = read_rate(), read_rate()
-    optional_input_names, optional_input_amounts = read_res(), read_rate()
-
-    return BlockRates(namestr,
-                      {n: a for n, a in zip(input_names, input_amounts)},
-                      {n: a for n, a in zip(output_names, output_amounts)},
-                      {n: a for n, a in zip(optional_input_names, optional_input_amounts)})
+    # This list is not exhaustive
+    return [(block_to_copy_start, 'blockToCopy', 'toolTipContent'),
+            (descend + 8, 'distanceToStreet', 'distanceToStreet'),
+            (descend + 16, 'inputs', 'optionalInputsAmounts'),
+            (agent_list_start, 'allAgentFunctionsString', 'allAgentFunctionsString')]
 
 
 def unpack_blocks(block_data, resource_data):
     print('Unpacking resource database...', end=' ')
-    rad = AssetDecoder(resource_data, 'ResourceItem.cs', 248)
-    rad.decode()
+    with BytesIO(resource_data) as f:
+        rad = AssetDecoder(f, 'ResourceItem.cs', 248)
+        rad.decode()
     print('%d resources.' % len(rad.items))
 
     print('Unpacking block database...', end=' ')
@@ -157,24 +161,33 @@ def unpack_blocks(block_data, resource_data):
     agent_needle = 'oneAdjacentNeighbor'.encode('utf-8')
     first = True
 
-    blocks = {}
-    while True:
-        agent_str_start = block_data.find(agent_needle, agent_str_start)
-        if agent_str_start == -1:
-            break
+    blocks = []
+    with BytesIO(block_data) as f:
+        bad = JumbledAssetDecoder(f, 'Block.cs', 0)
+        while True:
+            agent_str_start = block_data.find(agent_needle, agent_str_start)
+            if agent_str_start == -1:
+                break
 
-        agent_list_start = agent_str_start - 8
-        lens = unpack_from('II', block_data, agent_list_start)
-        if lens[1] != len(agent_needle) or lens[0] < 1 or lens[0] > 20:
-            print('Warning: weird lengths', lens)
-        elif first:
-            first = False
-        else:
-            block = get_block(block_data, agent_list_start, rad.items)
-            blocks[block.name] = block
+            agent_list_start = agent_str_start - 8
+            lens = unpack_from('II', block_data, agent_list_start)
+            if lens[1] != len(agent_needle) or lens[0] < 1 or lens[0] > 20:
+                print('Warning: weird lengths', lens)
+            elif first:
+                first = False
+            else:
+                block_sects = get_block_sections(block_data, agent_list_start)
+                blocks.append(bad.decode_one(block_sects))
 
-        agent_str_start += len(agent_needle)
+            agent_str_start += len(agent_needle)
+
+    for b in blocks:
+        for kn in ('inputs', 'outputs', 'optionalInputs'):
+            ka = kn + 'Amounts'
+            b[kn] = {rad.items[n+1]['alias']: round(a, 8)  # Deal with single-to-double error
+                     for n, a in zip(b[kn], b[ka])}
+
     print('%d blocks.' % len(blocks))
 
-    return (sorted(blocks.values(), key=lambda b: b.name),
+    return (sorted(blocks, key=lambda b: b['toolTipHeader']),
             sorted(rad.items, key=lambda r: r['alias']))

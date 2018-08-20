@@ -47,6 +47,8 @@ class String(FieldType):
 
     def read(self, f):
         str_len = _read_int(f)
+        if not str_len:
+            return ''
         val = _read(f, str_len).decode('utf-8')
 
         # 4-byte alignment
@@ -92,4 +94,6 @@ class List(FieldType):
 
     def read(self, f):
         list_len = _read_int(f)
+        if list_len > 100:
+            raise ValueError('Suspicious list length of %d' % list_len)
         return tuple(self.inner.read(f) for _ in range(list_len))

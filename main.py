@@ -6,17 +6,25 @@ from unity_unpack import unpack_blocks
 
 
 def hashable_res(block):
+    # The inner tuples must contain everything the optimizer cares about
     res = sorted((m, rk, rv)
-                 for m in ('inputs', 'opt_inputs', 'outputs')
-                 for rk, rv in getattr(block, m).items())
-    return tuple(res)
+                 for m in ('inputs', 'optionalInputs', 'outputs')
+                 for rk, rv in block[m].items())
+    with_conns = (tuple(res), *(block['connectUpper' + d] for d in ('Forward', 'Back', 'Left', 'Right')))
+    return with_conns
 
 
 def trim(blocks):
-    unavailable = {'TRAILER', "BLOCK'HOME", 'BLOKCORP HQ', 'TREEHOUSE', 'CANAL BRIDGE'}
-    for u in unavailable:
-        i = next(i for i, b in enumerate(blocks) if b.name == u)
+    old_len = len(blocks)
+    while True:
+        try:
+            i = next(i for i, b in enumerate(blocks)
+                     if  # b['category'] == 'WILD_TILES' or b['toolTipHeader'] == 'CANAL BRIDGE')
+                     b['toolTipHeader'] in {'TRAILER', "BLOCK'HOME", 'BLOKCORP HQ', 'TREEHOUSE', 'CANAL BRIDGE'})
+        except StopIteration:
+            break
         del blocks[i]
+    len_after_un = len(blocks)
 
     blocks_hashable = sorted((hashable_res(b), ib) for ib, b in enumerate(blocks))
     to_remove = set()
@@ -34,7 +42,8 @@ def trim(blocks):
     for ib in sorted(to_remove, reverse=True):
         del blocks[ib]
 
-    print('Trimmed blocks: %d unavailable, %d equivalent.' % (len(unavailable), len(to_remove)))
+    print('Trimmed blocks: %d unavailable, %d equivalent.' % (old_len - len_after_un,
+                                                              len_after_un - len(blocks)))
 
 
 def main():
