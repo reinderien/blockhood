@@ -7,7 +7,6 @@ max_res = 40             # Actually 80 but let's be safe
 init_money = 150         # Needs to be below 80 at the end
 max_area = 8 ** 2
 max_vol = max_area * 10  # include height
-struct_ratio = 4 / max_area
 rate_units = 20          # rates are in resource per 20s
 
 
@@ -62,8 +61,11 @@ class Analyse:
         return rates_no_opt, rates_opt
 
     def _get_c(self):
-        # Cost not based on resource generation (limits now take care of that), but block count
-        return np.ones((1, self.nb))
+        rates = self.rates_no_opt + self.rates_opt
+        rates[self.air_index, :] *= -1  # Air production counts against cost
+        rates[self.wild_index, :] = 0   # Wilderness does not count at all
+        rates[self.money_index, :] = 0  # Money merit is non-linear so don't weigh it here
+        return np.sum(rates, 0)
 
     def _get_bounds(self):
         a_lower_rates = self.rates_no_opt              # Only mandatory rates influence minima
@@ -71,9 +73,9 @@ class Analyse:
         b_lower_rates[self.air_index] = min_air        # Lowest fresh air allowable
         b_lower_rates[self.money_index] = -init_money  # Lowest rate of money - left with nothing
 
-        a_upper_rates = self.rates_no_opt + self.rates_opt   # Allow opt inputs to help rate maxima
-        b_upper_rates = np.full((self.nr, 1), max_res)  # Upper rate for most resources is 80
-        b_upper_rates[self.money_index] -= init_money   # Most amount of money left at end is 80
+        a_upper_rates = self.rates_no_opt + self.rates_opt  # Allow opt inputs to help rate maxima
+        b_upper_rates = np.full((self.nr, 1), max_res)      # Upper rate for most resources is 80
+        b_upper_rates[self.money_index] -= init_money       # Most amount of money left at end is 80
 
         # Neither fresh air nor wilderness have maxima
         a_upper_rates = np.delete(a_upper_rates, (self.air_index, self.wild_index), 0)
@@ -83,20 +85,11 @@ class Analyse:
         a_upper_count = np.ones((1, self.nb))
         b_upper_count = np.array(max_vol, ndmin=2)
 
-        # Make tall design realizable by including a minimum ratio of structural blocks
-        # If Σstruct >= μΣtotal, then
-        # (1 - μ)Σstruct - μΣnonstruct >= 0
-        #a_lower_struct = np.array(tuple(1 - struct_ratio if b['allowUpper'] else -struct_ratio
-        #                                for b in blocks), ndmin=2)
-        #b_lower_struct = np.zeros((1, 1))
-
         # Lower bounds must be negated
         a_upper = np.append(-a_lower_rates,
-        #         np.append(-a_lower_struct,
-                  np.append(a_upper_rates, a_upper_count, 0), 0)  #, 0)
+                  np.append(a_upper_rates, a_upper_count, 0), 0)
         b_upper = np.append(-b_lower_rates,
-        #         np.append(-b_lower_struct,
-                  np.append(b_upper_rates, b_upper_count, 0), 0)  #, 0)
+                  np.append(b_upper_rates, b_upper_count, 0), 0)
         return a_upper, b_upper
 
     def _show(self, res):
@@ -113,7 +106,7 @@ class Analyse:
 
         print('Block count: optimized count, area-normalized, rounded:')
         print('{:20s} {:>6s} {:>6s} {:>6s}'.format('Block', 'N', 'NormN', 'Round'))
-        print('\n'.join('{:20s} {:>6.1f} {:>6.1f} {:>6.1f}'.format(self.blocks[i]['toolTipHeader'], c,n,r)
+        print('\n'.join('{:20s} {:>6.1f} {:>6.1f} {:>6d}'.format(self.blocks[i]['toolTipHeader'], c,n,int(r))
                         for i, (c,n,r) in enumerate(zip(block_counts, norm_block_counts, round_block_counts))
                         if c > 0.01))
         print()
@@ -121,24 +114,27 @@ class Analyse:
         xc = np.array(block_counts, ndmin=2).T
         xn = np.array(norm_block_counts, ndmin=2).T
         xr = np.array(round_block_counts, ndmin=2).T
-        nc = np.matmul(self.rates_no_opt, xc)
-        nn = np.matmul(self.rates_no_opt, xn)
-        nr = np.matmul(self.rates_no_opt, xr)
-        oc = np.matmul(self.rates_opt, xc)
-        on = np.matmul(self.rates_opt, xn)
-        oR = np.matmul(self.rates_opt, xr)
-        print('Resource production rate, mandatory/optional; count, normalized, rounded:')
-        print('{:15s} {:>8s} {:>8s} {:>8s} {:>8s} {:>8s} {:>8s}'.format('Resource', 'cMand', 'cOpt', 'nMand', 'nOpt',
-                                                                        'rMand', 'rOpt'))
-        print('\n'.join('{:15s} {:8.2f} {:8.2f} {:8.2f} {:8.2f} {:8.2f} {:8.2f}'
-                        .format(self.resources[i]['alias'], *(v[0] for v in vals))
-                        for i, vals in enumerate(zip(nc,oc, nn,on, nr,oR))
-                        if abs(vals[0]) >= 1e-2 or abs(vals[1]) >= 1e-2))
-        print()
+        nc = np.matmul(self.rates_no_opt, xc) / rate_units
+        nn = np.matmul(self.rates_no_opt, xn) / rate_units
+        nr = np.matmul(self.rates_no_opt, xr) / rate_units
+        oc = np.matmul(self.rates_opt, xc) / rate_units
+        on = np.matmul(self.rates_opt, xn) / rate_units
+        oR = np.matmul(self.rates_opt, xr) / rate_units
+        time = min_air/nr[self.air_index]
 
-        time = min_air/nr[self.air_index] * rate_units
+        init = np.zeros((1, self.nb))
+        init[:, self.money_index] = init_money
+        xwin = init + time*(nr + oR)
 
         print('After normalizing and rounding,')
+        print('Resource production rate, mandatory/optional; count at win:')
+        print('{:15s} {:>8s} {:>8s} {:>8s}'.format('Resource', 'Mand', 'Opt', 'Win'))
+        print('\n'.join('{:15s} {:8.2f} {:8.2f} {:8.1f}'
+                        .format(self.resources[i]['alias'], *(v[0] for v in vals))
+                        for i, vals in enumerate(zip(nr, oR, xwin))
+                        if any(abs(v[0]) >= 1e-3 for v in vals)))
+        print()
+
         print('Number of blocks: %d' % sum(xr))
         print('Time to win (s): %.1f' % time)
 
