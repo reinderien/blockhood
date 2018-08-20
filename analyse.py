@@ -2,131 +2,151 @@ import numpy as np
 from scipy.optimize import linprog
 
 
-def get_rates(blocks, res_inds, nr):
-    rates_no_opt = np.empty((nr, 0))          # Resource rates without optionals
-    rates_opt = np.empty((nr, 0))             # Optional rates
-
-    for b, block in enumerate(blocks):
-        nocol = np.zeros((nr, 1))             # Column of mandatory rates for this block
-        opcol = np.zeros((nr, 1))             # Column of optional rates for this block
-
-        for res, qty in block['inputs'].items():
-            nocol[res_inds[res]] -= qty
-        for res, qty in block['optionalInputs'].items():
-            opcol[res_inds[res]] -= qty
-        for res, qty in block['outputs'].items():
-            if qty < 0:
-                col = opcol
-            else:
-                col = nocol
-            col[res_inds[res]] += qty
-
-        rates_no_opt = np.append(rates_no_opt, nocol, 1)
-        rates_opt = np.append(rates_opt, opcol, 1)
-    return rates_no_opt, rates_opt
+min_air = 500
+max_res = 40             # Actually 80 but let's be safe
+init_money = 150         # Needs to be below 80 at the end
+max_area = 8 ** 2
+max_vol = max_area * 10  # include height
+struct_ratio = 4 / max_area
+rate_units = 20          # rates are in resource per 20s
 
 
-def get_c(nb):
-    # Cost not based on resource generation (limits now take care of that), but block count
-
-    return np.ones((1, nb))
-
-
-def get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, blocks, nr, nb):
-    min_air = 500
-    max_res = 60      # Actually 80 but let's be safe
-    init_money = 150  # Needs to be below 80 at the end
-    max_area = 8**2
-    max_vol = max_area*10      # include height
-    struct_ratio = 4/max_area
-
-    a_lower_rates = rates_no_opt              # Only mandatory rates influence minima
-    b_lower_rates = np.zeros((nr, 1))         # Minimum rate for most resources is 0
-    b_lower_rates[air_index] = min_air        # Lowest fresh air allowable
-    b_lower_rates[money_index] = -init_money  # Lowest rate of money - left with nothing
-
-    a_upper_rates = rates_no_opt + rates_opt   # Allow opt inputs to help rate maxima
-    b_upper_rates = np.full((nr, 1), max_res)  # Upper rate for most resources is 80
-    b_upper_rates[money_index] -= init_money   # Most amount of money left at end is 80
-
-    # Neither fresh air nor wilderness have maxima
-    a_upper_rates = np.delete(a_upper_rates, (air_index, wild_index), 0)
-    b_upper_rates = np.delete(b_upper_rates, (air_index, wild_index), 0)
-
-    # The map is an 8x8 x 10 grid. As such, there is an upper bound on the block count.
-    a_upper_count = np.ones((1, nb))
-    b_upper_count = np.array(max_vol, ndmin=2)
-
-    # Make design realizable by including a minimum ratio of structural blocks
-    # If Σstruct >= μΣtotal, then
-    # (1 - μ)Σstruct - μΣnonstruct >= 0
-    a_lower_struct = np.array(tuple(1 - struct_ratio if b['allowUpper'] else -struct_ratio
-                                    for b in blocks), ndmin=2)
-    b_lower_struct = np.zeros((1, 1))
-
-    # Lower bounds must be negated
-    a_upper = np.append(-a_lower_rates,
-              np.append(-a_lower_struct,
-              np.append(a_upper_rates, a_upper_count, 0), 0), 0)
-    b_upper = np.append(-b_lower_rates,
-              np.append(-b_lower_struct,
-              np.append(b_upper_rates, b_upper_count, 0), 0), 0)
-    return a_upper, b_upper
-
-
-def show(res, blocks, resources, rates_no_opt, rates_opt):
-    print('Iterations:', res.nit)
-    print(res.message)
-    print()
-    if res.status != 0:
-        return
-
-    x = res.x  # np.around(res.x)
-    print('{:20s} {:>6s}'.format('Block', 'Count'))
-    print('\n'.join('{:20s} {:>6.1f}'.format(blocks[i]['toolTipHeader'], c)
-                    for i, c in enumerate(x)
-                    if c > 0.1))
-    print()
-
-    x = np.array(x, ndmin=2).T
-    no_opt = np.matmul(rates_no_opt, x)
-    opt = np.matmul(rates_opt, x)
-    print('{:15s} {:>8s} {:>8s}'.format('Resource', 'Mand', 'Opt'))
-    print('\n'.join('{:15s} {:8.2f} {:8.2f}'
-                    .format(resources[i]['alias'], rn[0], ro[0])
-                    for i, (rn, ro) in enumerate(zip(no_opt, opt))
-                    if abs(rn) >= 1e-2 or abs(ro) >= 1e-2))
-
-
-def analyse(blocks, resources):
+class Analyse:
     """
-    nb=231 blocks, nr=78 resources
+    nb=173 blocks, nr=78 resources
 
     Name dims     meaning
-    c    1,231    coefficients to minimize c*x
-    x    231,1    independent variable - block counts - comes in return var
-    Aub  78,231   upper-bound coefficients for A*x <= b
+    c    1,173    coefficients to minimize c*x
+    x    173,1    independent variable - block counts - comes in return var
+    Aub  78,173   upper-bound coefficients for A*x <= b
     bub  78,1     upper bound for A*x <= b, all 0
     bounds (min,max) defaults to [0, inf]                - omit this
 
     Block counts must not be negative: implied by default value of `bounds`
     """
 
-    print('Calculating a solution for the zero-footprint challenge...')
+    def __init__(self, blocks, resources):
+        self.resources, self.blocks = resources, blocks
+        self.res_inds = {r['alias']: i for i, r in enumerate(resources)}
+        self.air_index = self.res_inds['FRESH AIR']
+        self.wild_index = self.res_inds['WILDERNESS']
+        self.money_index = self.res_inds['MONEY']
+        self.nr, self.nb = len(resources), len(blocks)
+        self.rates_no_opt, self.rates_opt = self._get_rates()
 
-    res_inds = {r['alias']: i for i, r in enumerate(resources)}
-    air_index = res_inds['FRESH AIR']
-    wild_index = res_inds['WILDERNESS']
-    money_index = res_inds['MONEY']
-    nr, nb = len(resources), len(blocks)
-    rates_no_opt, rates_opt = get_rates(blocks, res_inds, nr)
+        # Generate as few resources as possible - except for fresh air, which should be maximized
+        self.c = self._get_c()
+        self.aub, self.bub = self._get_bounds()
 
-    # Generate as few resources as possible - except for fresh air, which should be maximized
-    c = get_c(nb)
+    def _get_rates(self):
+        rates_no_opt = np.empty((self.nr, 0))          # Resource rates without optionals
+        rates_opt = np.empty((self.nr, 0))             # Optional rates
 
-    aub, bub = get_limits(rates_no_opt, rates_opt, air_index, wild_index, money_index, blocks, nr, nb)
+        for b, block in enumerate(self.blocks):
+            nocol = np.zeros((self.nr, 1))             # Column of mandatory rates for this block
+            opcol = np.zeros((self.nr, 1))             # Column of optional rates for this block
 
-    # Interior point converges much faster for this problem than simplex, which isn't surprising considering that it
-    # "is intended to provide a faster and more reliable alternative to simplex, especially for large, sparse problems."
-    res = linprog(c=c, A_ub=aub, b_ub=bub, method='interior-point')
-    show(res, blocks, resources, rates_no_opt, rates_opt)
+            for res, qty in block['inputs'].items():
+                nocol[self.res_inds[res]] -= qty
+            for res, qty in block['optionalInputs'].items():
+                opcol[self.res_inds[res]] -= qty
+            for res, qty in block['outputs'].items():
+                if qty < 0:
+                    col = opcol
+                else:
+                    col = nocol
+                col[self.res_inds[res]] += qty
+
+            rates_no_opt = np.append(rates_no_opt, nocol, 1)
+            rates_opt = np.append(rates_opt, opcol, 1)
+        return rates_no_opt, rates_opt
+
+    def _get_c(self):
+        # Cost not based on resource generation (limits now take care of that), but block count
+        return np.ones((1, self.nb))
+
+    def _get_bounds(self):
+        a_lower_rates = self.rates_no_opt              # Only mandatory rates influence minima
+        b_lower_rates = np.zeros((self.nr, 1))         # Minimum rate for most resources is 0
+        b_lower_rates[self.air_index] = min_air        # Lowest fresh air allowable
+        b_lower_rates[self.money_index] = -init_money  # Lowest rate of money - left with nothing
+
+        a_upper_rates = self.rates_no_opt + self.rates_opt   # Allow opt inputs to help rate maxima
+        b_upper_rates = np.full((self.nr, 1), max_res)  # Upper rate for most resources is 80
+        b_upper_rates[self.money_index] -= init_money   # Most amount of money left at end is 80
+
+        # Neither fresh air nor wilderness have maxima
+        a_upper_rates = np.delete(a_upper_rates, (self.air_index, self.wild_index), 0)
+        b_upper_rates = np.delete(b_upper_rates, (self.air_index, self.wild_index), 0)
+
+        # The map is an 8x8 x 10 grid. As such, there is an upper bound on the block count.
+        a_upper_count = np.ones((1, self.nb))
+        b_upper_count = np.array(max_vol, ndmin=2)
+
+        # Make tall design realizable by including a minimum ratio of structural blocks
+        # If Σstruct >= μΣtotal, then
+        # (1 - μ)Σstruct - μΣnonstruct >= 0
+        #a_lower_struct = np.array(tuple(1 - struct_ratio if b['allowUpper'] else -struct_ratio
+        #                                for b in blocks), ndmin=2)
+        #b_lower_struct = np.zeros((1, 1))
+
+        # Lower bounds must be negated
+        a_upper = np.append(-a_lower_rates,
+        #         np.append(-a_lower_struct,
+                  np.append(a_upper_rates, a_upper_count, 0), 0)  #, 0)
+        b_upper = np.append(-b_lower_rates,
+        #         np.append(-b_lower_struct,
+                  np.append(b_upper_rates, b_upper_count, 0), 0)  #, 0)
+        return a_upper, b_upper
+
+    def _show(self, res):
+        print('Iterations:', res.nit)
+        print(res.message)
+        print()
+        if res.status != 0:
+            return
+
+        block_counts = res.x
+        n_blocks = sum(block_counts)
+        norm_block_counts = block_counts * max_area/n_blocks
+        round_block_counts = np.around(norm_block_counts)
+
+        print('Block count: optimized count, area-normalized, rounded:')
+        print('{:20s} {:>6s} {:>6s} {:>6s}'.format('Block', 'N', 'NormN', 'Round'))
+        print('\n'.join('{:20s} {:>6.1f} {:>6.1f} {:>6.1f}'.format(self.blocks[i]['toolTipHeader'], c,n,r)
+                        for i, (c,n,r) in enumerate(zip(block_counts, norm_block_counts, round_block_counts))
+                        if c > 0.01))
+        print()
+
+        xc = np.array(block_counts, ndmin=2).T
+        xn = np.array(norm_block_counts, ndmin=2).T
+        xr = np.array(round_block_counts, ndmin=2).T
+        nc = np.matmul(self.rates_no_opt, xc)
+        nn = np.matmul(self.rates_no_opt, xn)
+        nr = np.matmul(self.rates_no_opt, xr)
+        oc = np.matmul(self.rates_opt, xc)
+        on = np.matmul(self.rates_opt, xn)
+        oR = np.matmul(self.rates_opt, xr)
+        print('Resource production rate, mandatory/optional; count, normalized, rounded:')
+        print('{:15s} {:>8s} {:>8s} {:>8s} {:>8s} {:>8s} {:>8s}'.format('Resource', 'cMand', 'cOpt', 'nMand', 'nOpt',
+                                                                        'rMand', 'rOpt'))
+        print('\n'.join('{:15s} {:8.2f} {:8.2f} {:8.2f} {:8.2f} {:8.2f} {:8.2f}'
+                        .format(self.resources[i]['alias'], *(v[0] for v in vals))
+                        for i, vals in enumerate(zip(nc,oc, nn,on, nr,oR))
+                        if abs(vals[0]) >= 1e-2 or abs(vals[1]) >= 1e-2))
+        print()
+
+        time = min_air/nr[self.air_index] * rate_units
+
+        print('After normalizing and rounding,')
+        print('Number of blocks: %d' % sum(xr))
+        print('Time to win (s): %.1f' % time)
+
+    def analyse(self):
+        print('Calculating a solution for the zero-footprint challenge...')
+
+        # Interior point converges much faster for this problem than simplex, which isn't surprising considering that it
+        # "is intended to provide a faster and more reliable alternative to simplex, especially for large, sparse
+        # problems."
+        res = linprog(c=self.c, A_ub=self.aub, b_ub=self.bub, method='interior-point')
+        self._show(res)

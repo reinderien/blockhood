@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from analyse import analyse
+from analyse import Analyse
 from unity_asset_dir import search_asset_file
 from unity_unpack import unpack_blocks
 
@@ -61,7 +61,7 @@ def main():
     trim(blocks)
     print()
 
-    analyse(blocks, resources)
+    Analyse(blocks, resources).analyse()
 
 
 main()
