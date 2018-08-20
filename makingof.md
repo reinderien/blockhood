@@ -186,7 +186,7 @@ using the
 to explore some optimal consumption patterns.
 
 One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
-solutions back that have fractional block counts.
+solutions back that have fractional block counts. Rounding them allows for construction but introduces error.
 
 There are many different ways to optimize this problem:
 
@@ -223,7 +223,8 @@ and resource end amounts are equal. In reality the end amount would scale based 
       and between -150 and -70 such that the end amount of money is between 0 and 80.
     - The minimum fresh air rate is 500 as in the challenge. There is no maximum.
 - There is a finite amount of space. The board is 8×8, with up to 10 blocks in the air. As such, there is a maximum
-  block count of 640.
+  block count of 640. Imposing a minimum ratio of structural blocks is necessary if there is to be more than one
+  story, but it's easier to simply post-scale the solution so that there is only one story.
 
 ### Output
 
@@ -285,3 +286,5 @@ So does it work?
 ----------------
 
 Yes! The first solution set that I bothered to build won me the level.
+
+<img src="https://raw.githubusercontent.com/reinderien/blockhood/master/win.jpg" />
