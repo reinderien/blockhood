@@ -188,16 +188,22 @@ to explore some optimal consumption patterns.
 One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
 solutions back that have fractional block counts.
 
+There are many different ways to optimize this problem:
+
+- Minimize block count while still meeting challenge criteria
+- For fixed block count occupying whole area, "flat" (one story) for ease of construction,
+  minimize win time by maximizing fresh air production rate
+- Maximize fresh air production rate without a fixed block count, and then scale down to a fixed block count (current
+  approach)
+
 ### Variables
 
 This solver is essentially regulated by two equations, `Minimize c⋅x` and `A⋅x ≤ b`, where
 
 - `nr` and `nb` are the resource type count and block type count, respectively
 - `x` is an `nb`×1 column of block counts, the independent variable scipy is optimizing.
-- `c` is a 1×`nb` row of block count weights, representing the cost coefficients for each block. Currently these are all
-  set to 1 such that we simply optimize for the solution with the fewest blocks. When `c` and `x` are multiplied during
-  optimization, scipy gets a number that is called the value of the objective function. In our case that's equal to the
-  block count.
+- `c` is a 1×`nb` row of block count weights, representing the cost coefficients for each block. When `c` and `x` are
+  multiplied during optimization, scipy gets a number that is called the value of the objective function.
 - `A` and `b` control bounds. `A` is a many × `nb` matrix, and `b` is a many × 1 column.
 
 ### Bounds
@@ -218,8 +224,6 @@ and resource end amounts are equal. In reality the end amount would scale based 
     - The minimum fresh air rate is 500 as in the challenge. There is no maximum.
 - There is a finite amount of space. The board is 8×8, with up to 10 blocks in the air. As such, there is a maximum
   block count of 640.
-- Not all blocks support building above them (`allowUpper`). For any solution that has above 64 blocks, there must be
-  sufficient structural blocks to support upper levels. Currently there is a minimum of 4 structural blocks per story.
 
 ### Output
 
@@ -234,31 +238,50 @@ A current example of the output is:
     Iterations: 13
     Optimization terminated successfully.
     
-    Block                 Count
-    BEECH TREE GROVE       36.0
-    BOTANICAL GARDEN       30.0
-    BRISTLECONE PINE      139.0
-    GEOTHERMAL GENERATOR   10.0
-    LARGE APT              12.0
-    SHACK I                 6.0
-    SOIL                    6.4
-    SPRINKLERS             64.2
-    WATER TOWER            30.0
-    WETLAND                56.2
+    Block count: optimized count, area-normalized, rounded:
+    Block                     N  NormN  Round
+    ALGAE FARM              5.3    0.5      1
+    BEECH TREE GROVE      144.4   14.4     14
+    BIOMASS GENERATOR       5.6    0.6      1
+    BRISTLECONE PINE       20.4    2.0      2
+    CEMETERY               68.9    6.9      7
+    CORNER APT             42.2    4.2      4
+    CROSS SUPPORT          74.5    7.4      7
+    GEOTHERMAL GENERATOR    8.0    0.8      1
+    SCHOOL                  5.6    0.6      1
+    SPRINKLERS            192.4   19.2     19
+    WATER TOWER            28.4    2.8      3
+    WETLAND                34.4    3.4      3
+    YOGA STUDIO            10.0    1.0      1
     
-    Resource            Mand      Opt
-    ALGAE              56.16     0.00
-    COMMUNITY          54.00     0.00
-    CONSUMER           60.00     0.00
-    ELECTRICITY        45.68     0.00
-    FERTILIZER          2.51     0.00
-    FRESH AIR         500.00    -0.00
-    GREENHOUSE GAS      1.00  -108.00
-    GREYWATER          60.00    -0.00
-    LEISURE            60.00     0.00
-    MONEY             -90.00     0.00
-    ORGANIC WASTE      60.00  -118.67
-    RISK               12.00    -0.00
-    TOURIST            60.00     0.00
-    WILDERNESS        303.16   -90.00
-    YOUTH              36.00     0.00
+    After normalizing and rounding,
+    Resource production rate, mandatory/optional; count at win:
+    Resource            Mand      Opt      Win
+    ALGAE              -0.15     0.00    -26.8
+    COMMUNITY           0.25     0.00     44.6
+    ELECTRICITY         0.38     0.00     67.0
+    FERTILIZER          0.20     0.00     35.7
+    FITNESS             0.20     0.00     35.7
+    FRESH AIR           2.80     0.00    500.0
+    GREENHOUSE GAS      0.01    -2.15   -383.0
+    GREYWATER          -0.20     0.00    -35.7
+    KNOWLEDGE           0.30     0.00     53.6
+    LABOR              -0.05     0.00     -8.9
+    LEISURE             0.20     0.00     35.7
+    MONEY              -0.57     0.00   -101.8
+    ORGANIC WASTE       0.40    -0.30     17.9
+    SICKNESS            0.00    -1.05   -187.5
+    WATER               0.30     0.00     53.6
+    WILDERNESS          2.35     0.00    419.6
+    
+    Number of blocks: 64
+    Time to win (s): 178.6
+
+A caveat: this solution completes very quickly, so the time required for user construction introduces error. The effect
+is that some resources become intermittently depleted, producing decay - but if construction is completed fast enough,
+few blocks should decay to the point of requiring replacement.
+
+So does it work?
+----------------
+
+Yes! The first solution set that I bothered to build won me the level.
