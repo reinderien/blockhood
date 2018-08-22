@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import re
-from itertools import count
 from requests import get
+from string import Template
 from unity_asset_dir import get_dbs
 from unity_unpack import unpack_dbs
 
@@ -14,6 +14,17 @@ class PagedOutError(Exception):
 class Block:
     re_prop = re.compile(r'\| (\w+) *= *(.*)$', re.M)
     re_cat = re.compile(r'\[\[Category:(?!Blocks)([^\]]+)\]\]')
+
+    cats = {'BUILDINGS':       'Buildings',
+            'ADV_BUILDINGS':   'Buildings',
+            'PUBLIC_SPACE':    'Public Space',
+            'ADV_PUBLICSPACE': 'Public Space',
+            'ADV_PUBLIC_2':    'Public Space',
+            'PRODUCTION':      'Production',
+            'ADV_PRODUCTION':  'Production',
+            'ORGANIC':         'Organics',
+            'ADV_ORGANIC':     'Organics',
+            'WILD_TILES':      'Natural blocks'}
 
     def __init__(self, data):
         self.title = data['title']
@@ -29,31 +40,36 @@ class Block:
         self.discontinued = 'Discontinued' in content
         self.stub = 'Infobox' not in content
         if self.stub:
-            return
+            self.props = {}
+        else:
+            self.props = {m[1]: m[2] for m in self.re_prop.finditer(content)}
 
-        self.props = {m[1]: m[2] for m in self.re_prop.finditer(content)}
-        self.desc = self.props.get('desc')
-        self.res_in, self.res_in_opt, self.res_out = {}, {}, {}
-        self.init_resources()
+    def _add_p(self, name_k, qty_k, name, val, index):
+        self.props.update({'%s%d' % (name_k, index): name.title(),
+                           '%s_qty%d' % (qty_k, + index): '%g' % val})
 
-    def init_resources(self):
-        for i in count(1):
-            in_name = self.props.get('input%d' % i, '').strip()
-            if in_name:
-                is_opt = self.props.get('opt%d' % i) == 'yes'
-                upd = self.res_in_opt if is_opt else self.res_in
-                upd[in_name] = float(self.props.get('in_qty%d' % i) or '0')
-            out_name = self.props.get('output%d' % i, '').strip()
-            if out_name:
-                self.res_out[out_name] = float(self.props.get('out_qty%d' % i) or '0')
-            if not (in_name or out_name):
-                break
+    def load_unity(self):
+        self.props['desc'] = self.unity_data['toolTipContent']
+        self.category = Block.cats[self.unity_data['category']]
+
+        for in_i, (in_n, in_x) in enumerate(self.unity_data['inputs'].items(), start=1):
+            self._add_p('input', 'in', in_n, in_x, in_i)
+        for opt_i, (opt_n, opt_x) in enumerate(self.unity_data['optionalInputs'].items(), start=in_i+1):
+            self._add_p('input', 'in', opt_n, opt_x, opt_i)
+            self.props['opt%d' % opt_i] = 'yes'
+        for out_i, (out_n, out_x) in enumerate(self.unity_data['outputs'].items(), start=1):
+            self._add_p('output', 'out', out_n, out_x, out_i)
 
     def __str__(self):
         return self.category + '.' + self.title
 
     def __lt__(self, other):
         return str(self) < str(other)
+
+    def get_mwpage(self):
+        with open('mwpage.tpl') as f:
+            tpl = Template(f.read())
+        return tpl.substitute(self.props, cat=self.category)
 
 
 def iter_blocks():
@@ -107,6 +123,7 @@ def merge(blocks_web):
         bw_title = bw.title.title()
         if bw_title in both:
             bw.unity_data = next(bu for bu in blocks_un if bu['toolTipHeader'].title() == bw_title)
+            bw.load_unity()
 
     print('Blocks only on the web, probably deprecated:',
           ', '.join(only_web))
