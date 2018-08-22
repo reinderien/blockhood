@@ -5,14 +5,6 @@ from itertools import count
 from requests import get
 
 
-class DiscontinuedError(Exception):
-    pass
-
-
-class StubError(Exception):
-    pass
-
-
 class PagedOutError(Exception):
     pass
 
@@ -28,27 +20,28 @@ class Block:
             raise PagedOutError(self.title + ' not in this page')
 
         content = data['revisions'][0]['*']
-        if 'Discontinued' in content:
-            raise DiscontinuedError(self.title + ' is discontinued')
-        if 'Infobox' not in content:
-            raise StubError(self.title + ' is an incomplete stub')
-
         self.category = self.re_cat.search(content)[1]
 
-        props = {m[1]: m[2] for m in self.re_prop.finditer(content)}
-        self.desc = props.get('desc')
+        self.discontinued = 'Discontinued' in content
+        self.stub = 'Infobox' not in content
+        if self.stub:
+            return
 
+        self.props = {m[1]: m[2] for m in self.re_prop.finditer(content)}
+        self.desc = self.props.get('desc')
         self.res_in, self.res_in_opt, self.res_out = {}, {}, {}
+        self.init_resources()
 
+    def init_resources(self):
         for i in count(1):
-            in_name = props.get('input%d' % i, '').strip()
+            in_name = self.props.get('input%d' % i, '').strip()
             if in_name:
-                is_opt = props.get('opt%d' % i) == 'yes'
+                is_opt = self.props.get('opt%d' % i) == 'yes'
                 upd = self.res_in_opt if is_opt else self.res_in
-                upd[in_name] = float(props.get('in_qty%d' % i) or '0')
-            out_name = props.get('output%d' % i, '').strip()
+                upd[in_name] = float(self.props.get('in_qty%d' % i) or '0')
+            out_name = self.props.get('output%d' % i, '').strip()
             if out_name:
-                self.res_out[out_name] = float(props.get('out_qty%d' % i) or '0')
+                self.res_out[out_name] = float(self.props.get('out_qty%d' % i) or '0')
             if not (in_name or out_name):
                 break
 
@@ -75,14 +68,16 @@ def iter_blocks():
 
         for block_data in resp['query']['pages'].values():
             try:
-                yield Block(block_data)
-                n_complete += 1
+                block = Block(block_data)
+                if block.stub:
+                    n_stub += 1
+                elif block.discontinued:
+                    n_discontinued += 1
+                else:
+                    n_complete += 1
+                yield block
             except PagedOutError:
                 pass
-            except DiscontinuedError:
-                n_discontinued += 1
-            except StubError:
-                n_stub += 1
 
         print('Processed %d complete, %d discontinued, %d stubs' % (n_complete, n_discontinued, n_stub))
 
