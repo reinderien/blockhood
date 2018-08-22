@@ -1,4 +1,5 @@
 from io import BytesIO, SEEK_CUR, SEEK_SET
+from os import path
 from struct import unpack
 
 # Unity asset directory file
@@ -123,3 +124,18 @@ def search_asset_file(fn, paths_to_search):
         load_mono_behaviour(f, preload_table, shared_assets)
 
     return preload_table
+
+
+def get_dbs(steam_prefix):
+    print('Loading game databases...', end=' ')
+
+    block_id, resource_id = 21228, 21231
+    fn = path.join(steam_prefix, r'steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets')
+    dbs = search_asset_file(fn, (block_id, resource_id))
+    block_db, resource_db = dbs[block_id], dbs[resource_id]
+    print('Loaded %s %dkiB, %s %dkiB.' % (block_db['name'], block_db['size']/1024,
+                                          resource_db['name'], resource_db['size']/1024))
+
+    assert(block_db['name'] == 'blockDB_current')
+    assert(resource_db['name'] == 'resourceDB')
+    return block_db, resource_db

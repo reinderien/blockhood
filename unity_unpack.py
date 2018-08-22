@@ -149,7 +149,7 @@ def get_block_sections(data, agent_list_start):
             (agent_list_start, 'allAgentFunctionsString', 'allAgentFunctionsString')]
 
 
-def unpack_blocks(block_data, resource_data):
+def unpack_dbs(block_data, resource_data):
     print('Unpacking resource database...', end=' ')
     with BytesIO(resource_data) as f:
         rad = AssetDecoder(f, 'ResourceItem.cs', 248)
