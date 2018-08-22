@@ -55,6 +55,11 @@ class Block:
         self.props['desc'] = self.unity_data['toolTipContent']
         self.category = Block.cats[self.unity_data['category']]
 
+        # Initialize to defaults
+        self.props.update({k + str(i): ''
+                           for k in ('input', 'in_qty', 'output', 'out_qty', 'opt')
+                           for i in range(1, 5)})
+
         in_i = 0
         for in_i, (in_n, in_x) in enumerate(self.unity_data['inputs'].items(), start=1):
             self._add_p('input', 'in', in_n, in_x, in_i)
@@ -76,7 +81,7 @@ class Block:
         return tpl.substitute(self.props, cat=self.category)
 
 
-def iter_blocks(sess):
+def download(sess):
     print('Loading blocks from Gamepedia...')
     params = {'action': 'query',
               'generator': 'categorymembers',
@@ -84,13 +89,19 @@ def iter_blocks(sess):
               'gcmtype': 'page',
               'gcmlimit': 250,
               'prop': 'revisions',
-              'rvprop': 'content'}
+              'rvprop': 'content',
+              'meta': 'tokens'}
+    blocks = []
     n_complete, n_discontinued, n_stub = 0, 0, 0
+    edit_token = None
 
     while True:
         resp = sess.get(mwurl, params=params)
         resp.raise_for_status()
         body = resp.json()
+        new_token = body['query'].get('tokens', {}).get('csrftoken')
+        if new_token:
+            edit_token = new_token
 
         for block_data in body['query']['pages'].values():
             try:
@@ -101,7 +112,7 @@ def iter_blocks(sess):
                     n_discontinued += 1
                 else:
                     n_complete += 1
-                yield block
+                blocks.append(block)
             except PagedOutError:
                 pass
 
@@ -111,6 +122,8 @@ def iter_blocks(sess):
             break
         params.update(body['continue'])
     print()
+
+    return sorted(blocks), edit_token
 
 
 def merge(blocks_web):
@@ -157,11 +170,29 @@ def login():
     return sess
 
 
+def upload(sess, blocks, edit_token):
+    for i,b in enumerate(blocks):
+        print('Editing %d/%d - %s' % (i+1, len(blocks), b.title))
+
+        params = {'action': 'edit',
+                  'pageid': b.id,
+                  'bot': True,
+                  'nocreate': True}
+        data = {'text': b.get_mwpage(),
+                'token': edit_token}
+        resp = sess.post(mwurl, params=params, data=data)
+        resp.raise_for_status()
+        body = resp.json()
+        assert(body['edit']['result'] == 'Success')
+
+
 def main():
     sess = login()
-    blocks_web = sorted(iter_blocks(sess))
+    blocks_web, edit_token = download(sess)
     merge(blocks_web)
 
+    stubs = [b for b in blocks_web if b.stub and not b.discontinued]
+    upload(sess, stubs, edit_token)
     return
 
 
