@@ -103,7 +103,7 @@ Using the tool from the older Unity 5.6.2 gets farther, producing:
 
 Still useless.
 
-There's a fairly extensive-looking of asset decoder projects on
+There's a fairly extensive-looking list of asset decoder projects on
 [ZenHax](http://zenhax.com/viewtopic.php?f=9&t=12).
 
 Using the somewhat-sketchy-looking and unhelpfully closed-source
@@ -185,9 +185,6 @@ using the
 [linprog function](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linprog.html)
 to explore some optimal consumption patterns.
 
-One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
-solutions back that have fractional block counts.
-
 There are many different ways to optimize this problem:
 
 - Minimize block count while still meeting challenge criteria
@@ -263,25 +260,37 @@ A current example of the output is:
     FERTILIZER          0.20     0.00     35.7
     FITNESS             0.20     0.00     35.7
     FRESH AIR           2.80     0.00    500.0
-    GREENHOUSE GAS      0.01    -2.15   -383.0
+    GREENHOUSE GAS      0.01    -2.15      0.0
     GREYWATER          -0.20     0.00    -35.7
     KNOWLEDGE           0.30     0.00     53.6
     LABOR              -0.05     0.00     -8.9
     LEISURE             0.20     0.00     35.7
-    MONEY              -0.57     0.00   -101.8
+    MONEY              -0.57     0.00     48.2
     ORGANIC WASTE       0.40    -0.30     17.9
-    SICKNESS            0.00    -1.05   -187.5
+    SICKNESS            0.00    -1.05      0.0
     WATER               0.30     0.00     53.6
     WILDERNESS          2.35     0.00    419.6
     
     Number of blocks: 64
     Time to win (s): 178.6
 
-A caveat: this solution completes very quickly, so the time required for user construction introduces error. The effect
-is that some resources become intermittently depleted, producing decay - but if construction is completed fast enough,
-few blocks should decay to the point of requiring replacement.
-
 So does it work?
 ----------------
 
 Yes! The first solution set that I bothered to build won me the level.
+
+Caveats
+-------
+
+One major drawback of this approach is that it doesn't support ILP (Integer Linear Programming), which means that we get
+solutions back that have fractional block counts, and when we round them, error is introduced.
+
+This solution completes very quickly, so the time required for user construction introduces error as well. The effect is
+that some resources become intermittently depleted, producing decay - but if construction is completed fast enough, few
+blocks should decay to the point of requiring replacement.
+
+This strategy does not account for synergies at all. You could try to construct the solution with no positive or
+negative synergy, which in theory should yield the results predicted.
+
+God forbid the developers change the version of Unity they use or significantly change the database format, or the
+loading code is immediately invalid.

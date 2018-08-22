@@ -111,20 +111,25 @@ class Analyse:
                         if c > 0.01))
         print()
 
-        xc = np.array(block_counts, ndmin=2).T
-        xn = np.array(norm_block_counts, ndmin=2).T
         xr = np.array(round_block_counts, ndmin=2).T
-        nc = np.matmul(self.rates_no_opt, xc) / rate_units
-        nn = np.matmul(self.rates_no_opt, xn) / rate_units
         nr = np.matmul(self.rates_no_opt, xr) / rate_units
-        oc = np.matmul(self.rates_opt, xc) / rate_units
-        on = np.matmul(self.rates_opt, xn) / rate_units
         oR = np.matmul(self.rates_opt, xr) / rate_units
         time = min_air/nr[self.air_index]
 
-        init = np.zeros((1, self.nb))
-        init[:, self.money_index] = init_money
-        xwin = init + time*(nr + oR)
+        init = np.zeros((self.nr, 1))
+        init[self.money_index] = init_money
+        # Final amounts won't go lower than zero if optional inputs drain them
+        reff = []
+        for n,o in zip(nr, oR):
+            n,o = n[0], o[0]
+            if o > 0 or n > -o:
+                r = n + o
+            elif n > 0:
+                r = 0
+            else:
+                r = n
+            reff.append(r)
+        xwin = init + time*np.array(reff, ndmin=2).T
 
         print('After normalizing and rounding,')
         print('Resource production rate, mandatory/optional; count at win:')
