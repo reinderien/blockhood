@@ -192,6 +192,7 @@ def unpack_dbs(block_data, resource_data):
                      for n, a in zip(b[kn], b[ka])}
 
     print('%d blocks.' % len(blocks))
+    print()
 
     return (sorted(blocks, key=lambda b: b['toolTipHeader']),
             sorted(rad.items, key=lambda r: r['alias']))

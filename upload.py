@@ -3,6 +3,8 @@
 import re
 from itertools import count
 from requests import get
+from unity_asset_dir import get_dbs
+from unity_unpack import unpack_dbs
 
 
 class PagedOutError(Exception):
@@ -15,6 +17,8 @@ class Block:
 
     def __init__(self, data):
         self.title = data['title']
+        self.id = data['pageid']
+        self.unity_data = None
         revs = data.get('revisions')
         if not revs:
             raise PagedOutError(self.title + ' not in this page')
@@ -53,6 +57,7 @@ class Block:
 
 
 def iter_blocks():
+    print('Loading blocks from Gamepedia...')
     params = {'action': 'query',
               'generator': 'categorymembers',
               'gcmtitle': 'Category:Blocks',
@@ -84,10 +89,36 @@ def iter_blocks():
         if 'batchcomplete' in resp:
             break
         params.update(resp['continue'])
+    print()
+
+
+def merge(blocks_web):
+    block_db, resource_db = get_dbs(r'D:\Program Files\SteamLibrary')
+    blocks_un, resources_un = unpack_dbs(block_db['data'], resource_db['data'])
+
+    web_names = {w.title.title() for w in blocks_web}
+    un_names = {b['toolTipHeader'].title() for b in blocks_un}
+
+    both = web_names & un_names
+    only_web = web_names - un_names
+    only_un = un_names - web_names
+
+    for bw in blocks_web:
+        bw_title = bw.title.title()
+        if bw_title in both:
+            bw.unity_data = next(bu for bu in blocks_un if bu['toolTipHeader'].title() == bw_title)
+
+    print('Blocks only on the web, probably deprecated:',
+          ', '.join(only_web))
+    print('Blocks missing from the web:', len(only_un))
+    print('Blocks present in both:', len(both))
+    print()
 
 
 def main():
-    blocks = sorted(iter_blocks())
+    blocks_web = sorted(iter_blocks())
+    merge(blocks_web)
+
     return
 
 
