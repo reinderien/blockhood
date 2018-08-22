@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import re
-from requests import get
+from requests import session
 from string import Template
 from unity_asset_dir import get_dbs
 from unity_unpack import unpack_dbs
+
+
+mwurl = 'https://blockhood.gamepedia.com/api.php'
 
 
 class PagedOutError(Exception):
@@ -52,6 +55,7 @@ class Block:
         self.props['desc'] = self.unity_data['toolTipContent']
         self.category = Block.cats[self.unity_data['category']]
 
+        in_i = 0
         for in_i, (in_n, in_x) in enumerate(self.unity_data['inputs'].items(), start=1):
             self._add_p('input', 'in', in_n, in_x, in_i)
         for opt_i, (opt_n, opt_x) in enumerate(self.unity_data['optionalInputs'].items(), start=in_i+1):
@@ -72,7 +76,7 @@ class Block:
         return tpl.substitute(self.props, cat=self.category)
 
 
-def iter_blocks():
+def iter_blocks(sess):
     print('Loading blocks from Gamepedia...')
     params = {'action': 'query',
               'generator': 'categorymembers',
@@ -80,14 +84,15 @@ def iter_blocks():
               'gcmtype': 'page',
               'gcmlimit': 250,
               'prop': 'revisions',
-              'rvprop': 'content',
-              'format': 'json'}
+              'rvprop': 'content'}
     n_complete, n_discontinued, n_stub = 0, 0, 0
 
     while True:
-        resp = get('https://blockhood.gamepedia.com/api.php', params=params).json()
+        resp = sess.get(mwurl, params=params)
+        resp.raise_for_status()
+        body = resp.json()
 
-        for block_data in resp['query']['pages'].values():
+        for block_data in body['query']['pages'].values():
             try:
                 block = Block(block_data)
                 if block.stub:
@@ -102,9 +107,9 @@ def iter_blocks():
 
         print('Processed %d complete, %d discontinued, %d stubs' % (n_complete, n_discontinued, n_stub))
 
-        if 'batchcomplete' in resp:
+        if 'batchcomplete' in body:
             break
-        params.update(resp['continue'])
+        params.update(body['continue'])
     print()
 
 
@@ -132,8 +137,29 @@ def merge(blocks_web):
     print()
 
 
+def login():
+    sess = session()
+    sess.params['format'] = 'json'
+    resp = sess.get(mwurl, params={'action': 'query',
+                                   'meta': 'tokens',
+                                   'type': 'login'})
+    resp.raise_for_status()
+    body = resp.json()
+    assert('batchcomplete' in body)
+    token = body['query']['tokens']['logintoken']
+
+    with open('.mwpass') as f:
+        resp = sess.post(mwurl, params={'action': 'login', 'lgname': 'Reinderien@block_updater'},
+                         data={'lgpassword': f.read(), 'lgtoken': token})
+    resp.raise_for_status()
+    body = resp.json()
+    assert(body['login']['result'] == 'Success')
+    return sess
+
+
 def main():
-    blocks_web = sorted(iter_blocks())
+    sess = login()
+    blocks_web = sorted(iter_blocks(sess))
     merge(blocks_web)
 
     return
