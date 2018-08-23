@@ -38,8 +38,10 @@ class JumbledAssetDecoder(AssetDecoder):
         if verbose:
             print()
             print()
-            print('{:>6} {:>6} {:>6} {:>4} {:>4} {:>4} {:25} {:25}'.format(
-                'From', 'To', 'Bytes', 'M1', 'M2', 'Mbrs', 'StartField', 'EndField'))
+            row = '{:>6} {:>6} {:>6} {:>4} {:>4} {:>4} {:25} {:25}'
+            header = row.format('From', 'To', 'Bytes', 'M1', 'M2', 'Mbrs', 'StartField', 'EndField')
+            print('Used:')
+            print(header)
             used_ranges = []
 
         item = {}
@@ -59,21 +61,25 @@ class JumbledAssetDecoder(AssetDecoder):
             end = self.f.tell()
 
             if verbose:
-                used_ranges.append((mbr_i, mbr_j))
-                print('{:6} {:6} {:6} {:4} {:4} {:4} {:25} {:25}'.format(
-                    curr, end, end-curr, mbr_i, mbr_j-1, mbr_j-mbr_i,
-                    *(self.mbrs[i].field_name for i in (mbr_i, mbr_j-1))))
+                used_ranges.append((mbr_i, mbr_j, curr, end))
+                print(row.format(curr, end, end-curr, mbr_i, mbr_j-1, mbr_j-mbr_i,
+                                 *(self.mbrs[i].field_name for i in (mbr_i, mbr_j-1))))
         if verbose:
-            print()
             print('Missed:')
-            print('{:>25} {:>4} {:>4} {:25} {:25}'.format(
-                'M1', 'M2', 'N', 'StartField', 'EndField'))
+            print(header)
             used_ranges = sorted(used_ranges)
-            used_ranges.append((len(self.mbrs), None))
+            used_ranges.append((len(self.mbrs), '?', '?', '?'))
             prev_i = 0
-            for used_i, used_j in used_ranges:
+            for used_i, used_j, used_o1, used_o2 in used_ranges:
                 if used_i > prev_i:
-                    print('{:25} {:4} {:4} {:25} {:25}'.format(
+                    try:
+                        missed_o1 = next(o2 for u1, u2, o1, o2 in used_ranges
+                                         if u2 == prev_i)
+                    except StopIteration:
+                        missed_o1 = '?'
+
+                    print(row.format(
+                        missed_o1, used_o1,  '?',
                         prev_i, used_i-1, used_i-prev_i,
                         *(self.mbrs[i].field_name for i in (prev_i, used_i-1))))
                 prev_i = used_j
