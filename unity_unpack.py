@@ -5,6 +5,7 @@ from struct import unpack_from
 import re
 
 Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_name', 'field_type'))
+verbose = False
 
 
 class AssetDecoder:
@@ -34,18 +35,49 @@ class JumbledAssetDecoder(AssetDecoder):
         super().__init__(f, source_fn, first_offset)
 
     def decode_one(self, sections):
+        if verbose:
+            print()
+            print()
+            print('{:>6} {:>6} {:>6} {:>4} {:25} {:25}'.format(
+                'From', 'To', 'Bytes', 'Mbrs', 'StartField', 'EndField'))
+            used_ranges = []
+
         item = {}
         for off, mbr_first, mbr_last in sections:
             if off < 0:  # relative
                 self.f.seek(-off, SEEK_CUR)
+                curr = self.f.tell()
             else:
                 self.f.seek(off, SEEK_SET)
+                curr = off
             mbr_i = next(i for i,m in enumerate(self.mbrs) if m.field_name == mbr_first)
             mbr_j = mbr_i + 1 + next(j for j,m in enumerate(self.mbrs[mbr_i:]) if m.field_name == mbr_last)
+            if verbose:
+                used_ranges.append((mbr_i, mbr_j))
             for mbr in self.mbrs[mbr_i:mbr_j]:
                 before_fail_pos = self.f.tell()
                 val = mbr.field_type.read(self.f)
                 item[mbr.field_name] = val
+            end = self.f.tell()
+
+            if verbose:
+                print('{:6} {:6} {:6} {:4} {:25} {:25}'.format(
+                    curr, end, end-curr, mbr_j-mbr_i,
+                    *(self.mbrs[i].field_name for i in (mbr_i, mbr_j))))
+        if verbose:
+            print()
+            print('Missed:')
+            print('{:>3} {:>3} {:>3} {:25} {:25}'.format(
+                'frm', 'to', 'n', 'first_member', 'last_member'))
+            used_ranges = sorted(used_ranges)
+            used_ranges.append((len(self.mbrs), None))
+            prev_i = 0
+            for used_i, used_j in used_ranges:
+                if used_i > prev_i:
+                    print('{:3} {:3} {:3} {:25} {:25}'.format(
+                        prev_i, used_i-1, used_i-prev_i,
+                        *(self.mbrs[i].field_name for i in (prev_i, used_i-1))))
+                prev_i = used_j
         return item
 
 
@@ -159,7 +191,8 @@ def get_block_sections(bad, data, agent_list_start):
     return [(tex_start, 'altTexture1', 'toolTipContent'),
             (descend + 8, 'distanceToStreet', 'distanceToStreet'),
             (descend + 16, 'inputs', 'optionalInputsAmounts'),
-            (agent_list_start, 'allAgentFunctionsString', 'allAgentFunctionsString')]
+            (agent_list_start, 'allAgentFunctionsString', 'intsForfunctionsToCall4')]
+            # (-24, 'myType', 'prevSynergy')]
 
 
 def unpack_dbs(block_data, resource_data):
