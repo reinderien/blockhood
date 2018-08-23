@@ -150,10 +150,13 @@ def get_block_sections(bad, data, agent_list_start):
             break
         new_start, new_end, content = find_by_int(data, str_end)
         str_end = new_start
-    alias_spanish_start = new_start
+
+    # It's doubtful that altTexture1 actually starts here - it looks like boolean data - but...
+    # whatever, it parses, and gets us the i18n data correctly after
+    tex_start = new_start - 80
 
     # This list is not exhaustive
-    return [(alias_spanish_start, 'alias_spanish', 'toolTipContent'),
+    return [(tex_start, 'altTexture1', 'toolTipContent'),
             (descend + 8, 'distanceToStreet', 'distanceToStreet'),
             (descend + 16, 'inputs', 'optionalInputsAmounts'),
             (agent_list_start, 'allAgentFunctionsString', 'allAgentFunctionsString')]
