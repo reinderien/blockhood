@@ -64,6 +64,9 @@ by hand, so I
 [asked the developer for some data](https://www.facebook.com/blockhoodgame/posts/1877621299022835)
 but haven't heard back.
 
+The web scraping effort didn't go to waste - refer to the
+[uploader bot](https://github.com/reinderien/blockhood/blob/master/upload.md).
+
 ### Game database
 
 Second approach: scrape the game itself. Based on a dumb directory search, the data live in this file:

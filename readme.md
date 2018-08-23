@@ -11,6 +11,9 @@ I'm unaffiliated. I bought and enjoy the game, so I wrote this application to do
 For details of the development process, see
 [making of](https://github.com/reinderien/blockhood/blob/master/makingof.md).
 
-The project also has an uploader bot for the GamePedia wiki to update block pages.
+The project also has an
+[uploader bot](https://github.com/reinderien/blockhood/blob/master/upload.md)
+for the GamePedia wiki to update block pages.
 
-To chat about the project, visit https://gitter.im/blockhood.
+To chat about the project, visit
+[BlockHood Balance on Gitter](https://gitter.im/blockhood).
