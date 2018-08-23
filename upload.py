@@ -29,45 +29,48 @@ class Block:
             'ADV_ORGANIC':     'Organics',
             'WILD_TILES':      'Natural blocks'}
 
-    def __init__(self, data):
-        self.title = data['title']
-        self.id = data['pageid']
-        self.unity_data = None
+    def __init__(self, title, category, props, id=None, stub=False, discontinued=False, web=False, unity=False):
+        self.title, self.category, self.props, self.id, self.stub, self.discontinued, self.web, self.unity = \
+            title, category, props, id, stub, discontinued, web, unity
+
+    @staticmethod
+    def from_web(data):
         revs = data.get('revisions')
         if not revs:
-            raise PagedOutError(self.title + ' not in this page')
-
+            raise PagedOutError()
         content = data['revisions'][0]['*']
-        self.category = self.re_cat.search(content)[1]
-
-        self.discontinued = 'Discontinued' in content
-        self.stub = 'Infobox' not in content
-        if self.stub:
-            self.props = {}
+        stub = 'Infobox' not in content
+        if stub:
+            props = {}
         else:
-            self.props = {m[1]: m[2] for m in self.re_prop.finditer(content)}
+            props = {m[1]: m[2] for m in Block.re_prop.finditer(content)}
+        return Block(title=data['title'], id=data['pageid'], props=props, stub=stub, web=True,
+                     category=Block.re_cat.search(content)[1],
+                     discontinued='Discontinued' in content)
 
-    def _add_p(self, name_k, qty_k, name, val, index):
-        self.props.update({'%s%d' % (name_k, index): name.title(),
-                           '%s_qty%d' % (qty_k, + index): '%g' % val})
+    @staticmethod
+    def _add_p(props, name_k, qty_k, name, val, index):
+        props.update({'%s%d' % (name_k, index): name.title(),
+                      '%s_qty%d' % (qty_k, + index): '%g' % val})
 
-    def load_unity(self):
-        self.props['desc'] = self.unity_data['toolTipContent']
-        self.category = Block.cats[self.unity_data['category']]
-
+    @staticmethod
+    def from_unity(data):
         # Initialize to defaults
-        self.props.update({k + str(i): ''
-                           for k in ('input', 'in_qty', 'output', 'out_qty', 'opt')
-                           for i in range(1, 5)})
-
+        props = {'desc': data['toolTipContent']}
+        props.update({k + str(i): ''
+                      for k in ('input', 'in_qty', 'output', 'out_qty', 'opt')
+                      for i in range(1, 5)})
         in_i = 0
-        for in_i, (in_n, in_x) in enumerate(self.unity_data['inputs'].items(), start=1):
-            self._add_p('input', 'in', in_n, in_x, in_i)
-        for opt_i, (opt_n, opt_x) in enumerate(self.unity_data['optionalInputs'].items(), start=in_i+1):
-            self._add_p('input', 'in', opt_n, opt_x, opt_i)
-            self.props['opt%d' % opt_i] = 'yes'
-        for out_i, (out_n, out_x) in enumerate(self.unity_data['outputs'].items(), start=1):
-            self._add_p('output', 'out', out_n, out_x, out_i)
+        for in_i, (in_n, in_x) in enumerate(data['inputs'].items(), start=1):
+            Block._add_p(props, 'input', 'in', in_n, in_x, in_i)
+        for opt_i, (opt_n, opt_x) in enumerate(data['optionalInputs'].items(), start=in_i+1):
+            Block._add_p(props, 'input', 'in', opt_n, opt_x, opt_i)
+            props['opt%d' % opt_i] = 'yes'
+        for out_i, (out_n, out_x) in enumerate(data['outputs'].items(), start=1):
+            Block._add_p(props, 'output', 'out', out_n, out_x, out_i)
+
+        return Block(title=data['toolTipHeader'].title(),
+                     category=Block.cats[data['category']], props=props, unity=True)
 
     def __str__(self):
         return self.category + '.' + self.title
@@ -105,7 +108,7 @@ def download(sess):
 
         for block_data in body['query']['pages'].values():
             try:
-                block = Block(block_data)
+                block = Block.from_web(block_data)
                 if block.stub:
                     n_stub += 1
                 elif block.discontinued:
@@ -126,28 +129,38 @@ def download(sess):
     return sorted(blocks), edit_token
 
 
-def merge(blocks_web):
+def load_un():
     block_db, resource_db = get_dbs(r'D:\Program Files\SteamLibrary')
     blocks_un, resources_un = unpack_dbs(block_db['data'], resource_db['data'])
+    return [Block.from_unity(b) for b in blocks_un]
 
-    web_names = {w.title.title() for w in blocks_web}
-    un_names = {b['toolTipHeader'].title() for b in blocks_un}
 
+def merge(blocks_web, blocks_un):
+    web_lookup = {w.title.title(): w for w in blocks_web}
+    un_lookup = {u.title.title(): u for u in blocks_un}
+    web_names = set(web_lookup.keys())
+    un_names = set(un_lookup.keys())
     both = web_names & un_names
     only_web = web_names - un_names
     only_un = un_names - web_names
 
-    for bw in blocks_web:
-        bw_title = bw.title.title()
-        if bw_title in both:
-            bw.unity_data = next(bu for bu in blocks_un if bu['toolTipHeader'].title() == bw_title)
-            bw.load_unity()
+    merged = []
 
-    print('Blocks only on the web, probably deprecated:',
-          ', '.join(only_web))
+    for bn in only_un:
+        merged.append(un_lookup[bn])
+    for bn in only_web:
+        merged.append(web_lookup[bn])
+    for bn in both:
+        bu = un_lookup[bn]
+        bw = web_lookup[bn]
+        bu.id, bu.web, bu.stub, bu.discontinued = bw.id, bw.web, bw.stub, bw.discontinued
+
+    print('Blocks only on the web, probably deprecated:', ', '.join(only_web))
     print('Blocks missing from the web:', len(only_un))
     print('Blocks present in both:', len(both))
     print()
+
+    return merged
 
 
 def login():
@@ -170,14 +183,20 @@ def login():
     return sess
 
 
-def upload(sess, blocks, edit_token):
+def upload(sess, blocks, edit_token, update=True):
     for i,b in enumerate(blocks):
         print('Editing %d/%d - %s' % (i+1, len(blocks), b.title))
 
         params = {'action': 'edit',
-                  'pageid': b.id,
-                  'bot': True,
-                  'nocreate': True}
+                  'bot': True}
+        if update:
+            params['nocreate'] = True
+        else:
+            params['createonly'] = True
+        if b.id:
+            params['pageid'] = b.id
+        else:
+            params['title'] = b.title
         data = {'text': b.get_mwpage(),
                 'token': edit_token}
         resp = sess.post(mwurl, params=params, data=data)
@@ -189,10 +208,17 @@ def upload(sess, blocks, edit_token):
 def main():
     sess = login()
     blocks_web, edit_token = download(sess)
-    merge(blocks_web)
+    blocks_un = load_un()
+    blocks = merge(blocks_web, blocks_un)
 
-    stubs = [b for b in blocks_web if b.stub and not b.discontinued]
-    upload(sess, stubs, edit_token)
+    # Update stubs only
+    # to_update = [b for b in blocks if b.stub and not b.discontinued]
+
+    # Create anything missing
+    to_update = [b for b in blocks if not b.web
+                 and b.title != 'Grassland']  # Conflict with biome of same name
+
+    upload(sess, to_update, edit_token, update=False)
     return
 
 
