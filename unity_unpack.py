@@ -5,7 +5,7 @@ from struct import unpack_from
 import re
 
 Member = namedtuple('MemberType', ('field_index', 'access', 'type_name', 'field_name', 'field_type'))
-verbose = False
+verbose_decode = False
 
 
 class AssetDecoder:
@@ -35,7 +35,7 @@ class JumbledAssetDecoder(AssetDecoder):
         super().__init__(f, source_fn, first_offset)
 
     def decode_one(self, sections):
-        if verbose:
+        if verbose_decode:
             print()
             print()
             row = '{:>6} {:>6} {:>6} {:>4} {:>4} {:>4} {:25} {:25}'
@@ -46,9 +46,10 @@ class JumbledAssetDecoder(AssetDecoder):
 
         item = {}
         for off, mbr_first, mbr_last in sections:
-            if off < 0:  # relative
-                self.f.seek(-off, SEEK_CUR)
+            if off < 1:  # relative
                 curr = self.f.tell()
+                if off != 0:
+                    self.f.seek(-off, SEEK_CUR)
             else:
                 self.f.seek(off, SEEK_SET)
                 curr = off
@@ -60,11 +61,11 @@ class JumbledAssetDecoder(AssetDecoder):
                 item[mbr.field_name] = val
             end = self.f.tell()
 
-            if verbose:
+            if verbose_decode:
                 used_ranges.append((mbr_i, mbr_j, curr, end))
                 print(row.format(curr, end, end-curr, mbr_i, mbr_j-1, mbr_j-mbr_i,
                                  *(self.mbrs[i].field_name for i in (mbr_i, mbr_j-1))))
-        if verbose:
+        if verbose_decode:
             print('Missed:')
             print(header)
             used_ranges = sorted(used_ranges)
@@ -196,8 +197,8 @@ def get_block_sections(bad, data, agent_list_start):
     return [(tex_start, 'altTexture1', 'toolTipContent'),
             (descend + 8, 'distanceToStreet', 'distanceToStreet'),
             (descend + 16, 'inputs', 'optionalInputsAmounts'),
-            (agent_list_start, 'allAgentFunctionsString', 'needsAccessToProduce')]
-            # (-24, 'myType', 'prevSynergy')]
+            (agent_list_start, 'allAgentFunctionsString', 'needsAccessToProduce'),
+            (0, 'blockToSwap', 'prevSynergy')]
 
 
 def unpack_dbs(block_data, resource_data):
