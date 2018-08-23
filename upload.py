@@ -79,7 +79,7 @@ class Block:
         return str(self) < str(other)
 
     def get_mwpage(self):
-        with open('mwpage.tpl') as f:
+        with open('mwpage.html') as f:
             tpl = Template(f.read())
         return tpl.substitute(self.props, cat=self.category)
 
