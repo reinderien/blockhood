@@ -191,10 +191,10 @@ def get_block_sections(bad, data, agent_list_start):
 
     # It's doubtful that altTexture1 actually starts here - it looks like boolean data - but...
     # whatever, it parses, and gets us the i18n data correctly after
-    tex_start = new_start - 80
+    tex_start = new_start - 68
 
     # This list is not exhaustive
-    return [(tex_start, 'altTexture1', 'toolTipContent'),
+    return [(tex_start, 'altTexture2', 'toolTipContent'),
             (descend + 8, 'distanceToStreet', 'distanceToStreet'),
             (descend + 16, 'inputs', 'optionalInputsAmounts'),
             (agent_list_start, 'allAgentFunctionsString', 'needsAccessToProduce'),
@@ -243,7 +243,7 @@ def unpack_dbs(block_data, resource_data):
             b[kn] = {rad.items[n-1]['alias']: round(a, 8)  # Deal with single-to-double error
                      for n, a in zip(b[kn], b[ka])}
 
-    print('%d blocks.' % len(blocks))
+    print('%d blocks, %d/%d fields.' % (len(blocks), len(blocks[0].keys()), len(bad.mbrs)))
     print()
 
     return (sorted(blocks, key=lambda b: b['toolTipHeader']),

@@ -45,9 +45,24 @@ def trim(blocks):
                                                               len_after_un - len(blocks)))
 
 
+def export_blocks(blocks):
+    from csv import DictWriter
+
+    keys = tuple(blocks[0].keys())
+    with open('blocks.csv', 'w', encoding='utf-8', newline='') as f:
+        w = DictWriter(f, keys)
+        w.writeheader()
+
+        for b in blocks:
+            w.writerow(b)
+
+
 def main():
     block_db, resource_db = get_dbs(r'D:\Program Files\SteamLibrary')
     blocks, resources = unpack_dbs(block_db['data'], resource_db['data'])
+
+    # export_blocks(blocks)
+
     trim(blocks)
     print()
 
