@@ -191,7 +191,7 @@ def get_block_sections(bad, data, agent_list_start):
     return [(tex_start, 'altTexture1', 'toolTipContent'),
             (descend + 8, 'distanceToStreet', 'distanceToStreet'),
             (descend + 16, 'inputs', 'optionalInputsAmounts'),
-            (agent_list_start, 'allAgentFunctionsString', 'intsForfunctionsToCall4')]
+            (agent_list_start, 'allAgentFunctionsString', 'needsAccessToProduce')]
             # (-24, 'myType', 'prevSynergy')]
 
 

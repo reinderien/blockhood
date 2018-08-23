@@ -10,7 +10,7 @@ def _read(f, n):
 
 
 def _read_int(f):
-    return unpack('I', _read(f, 4))[0]
+    return unpack('i', _read(f, 4))[0]
 
 
 class FieldType:
