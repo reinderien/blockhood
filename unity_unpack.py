@@ -52,8 +52,16 @@ class JumbledAssetDecoder(AssetDecoder):
                 except StopIteration:
                     missed_o1 = '?'
 
+                size = 0
+                fixed = True
+                for m in self.mbrs[prev_i: used_i]:
+                    size += m.field_type.size
+                    fixed &= m.field_type.fixed
+                if not fixed:
+                    size = '>%d' % size
+
                 print(self.row.format(
-                    '?', missed_o1, used_o1,  '?',
+                    '?', missed_o1, used_o1, size,
                     prev_i, used_i-1, used_i-prev_i,
                     *(self.mbrs[i].field_name for i in (prev_i, used_i-1))))
             prev_i = used_j

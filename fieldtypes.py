@@ -20,6 +20,8 @@ class FieldType:
 
 class Int(FieldType):
     names = ('int',)
+    size = 4
+    fixed = True
 
     def read(self, f):
         return _read_int(f)
@@ -27,13 +29,17 @@ class Int(FieldType):
 
 class Float(FieldType):
     names = ('float',)
+    size = 4
+    fixed = True
 
     def read(self, f):
-        return unpack('f', _read(f, 4))[0]
+        return unpack('f', _read(f, Float.size))[0]
 
 
 class Bool(FieldType):
     names = ('bool',)
+    size = 4
+    fixed = True
 
     def read(self, f):
         b = _read_int(f)
@@ -44,6 +50,8 @@ class Bool(FieldType):
 
 class String(FieldType):
     names = ('string',)
+    size = 4
+    fixed = False
 
     def read(self, f):
         str_len = _read_int(f)
@@ -60,19 +68,26 @@ class String(FieldType):
 
 class AssetRef(FieldType):
     names = ('Sprite', 'Texture', 'Block', 'AudioClip', 'Material')
+    size = 12
+    fixed = True
 
     def read(self, f):
-        return unpack('III', _read(f, 12))
+        return unpack('III', _read(f, AssetRef.size))
 
 
 class GameObject(FieldType):
     names = ('GameObject',)
+    size = 20
+    fixed = True
 
     def read(self, f):
-        return unpack('IIIII', _read(f, 20))
+        return unpack('IIIII', _read(f, GameObject.size))
 
 
 class Enum(FieldType):
+    size = 4
+    fixed = True
+
     def __init__(self, vals):
         self.vals = vals
 
@@ -83,12 +98,17 @@ class Enum(FieldType):
 
 class Vector3(FieldType):
     names = ('Vector3',)
+    size = 12  # ?? Not seen in the wild yet
+    fixed = True
 
     def read(self, f):
-        return unpack('fff', _read(f, 12))
+        return unpack('fff', _read(f, Vector3))
 
 
 class List(FieldType):
+    size = 4
+    fixed = False
+
     def __init__(self, inner):
         self.inner = inner
 
