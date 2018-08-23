@@ -127,7 +127,7 @@ def find_by_int(data, end):
     return start_i - 4, end, content
 
 
-def get_block_sections(data, agent_list_start):
+def get_block_sections(bad, data, agent_list_start):
     # Find a run of printable characters before the agent list
     descstart, descend, descstr = find_str(data, agent_list_start)
 
@@ -142,8 +142,18 @@ def get_block_sections(data, agent_list_start):
     my_name_start, my_name_end, my_name_str = find_by_int(data, is_walkable_start)
     block_to_copy_start = my_name_start - 24
 
+    block_mbr_i = next(i for i,m in enumerate(bad.mbrs) if m.field_name == 'blockToCopy')
+    str_end = block_to_copy_start
+    for mbr_i in range(block_mbr_i-1, -1, -1):
+        mbr = bad.mbrs[mbr_i]
+        if mbr.field_name == 'icon':
+            break
+        new_start, new_end, content = find_by_int(data, str_end)
+        str_end = new_start
+    alias_spanish_start = new_start
+
     # This list is not exhaustive
-    return [(block_to_copy_start, 'blockToCopy', 'toolTipContent'),
+    return [(alias_spanish_start, 'alias_spanish', 'toolTipContent'),
             (descend + 8, 'distanceToStreet', 'distanceToStreet'),
             (descend + 16, 'inputs', 'optionalInputsAmounts'),
             (agent_list_start, 'allAgentFunctionsString', 'allAgentFunctionsString')]
@@ -176,7 +186,7 @@ def unpack_dbs(block_data, resource_data):
             elif first:
                 first = False
             else:
-                block_sects = get_block_sections(block_data, agent_list_start)
+                block_sects = get_block_sections(bad, block_data, agent_list_start)
                 block = bad.decode_one(block_sects)
 
                 # This is a straight-up error in the data
