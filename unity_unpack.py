@@ -38,8 +38,8 @@ class JumbledAssetDecoder(AssetDecoder):
         if verbose:
             print()
             print()
-            print('{:>6} {:>6} {:>6} {:>4} {:25} {:25}'.format(
-                'From', 'To', 'Bytes', 'Mbrs', 'StartField', 'EndField'))
+            print('{:>6} {:>6} {:>6} {:>4} {:>4} {:>4} {:25} {:25}'.format(
+                'From', 'To', 'Bytes', 'M1', 'M2', 'Mbrs', 'StartField', 'EndField'))
             used_ranges = []
 
         item = {}
@@ -52,8 +52,6 @@ class JumbledAssetDecoder(AssetDecoder):
                 curr = off
             mbr_i = next(i for i,m in enumerate(self.mbrs) if m.field_name == mbr_first)
             mbr_j = mbr_i + 1 + next(j for j,m in enumerate(self.mbrs[mbr_i:]) if m.field_name == mbr_last)
-            if verbose:
-                used_ranges.append((mbr_i, mbr_j))
             for mbr in self.mbrs[mbr_i:mbr_j]:
                 before_fail_pos = self.f.tell()
                 val = mbr.field_type.read(self.f)
@@ -61,20 +59,21 @@ class JumbledAssetDecoder(AssetDecoder):
             end = self.f.tell()
 
             if verbose:
-                print('{:6} {:6} {:6} {:4} {:25} {:25}'.format(
-                    curr, end, end-curr, mbr_j-mbr_i,
-                    *(self.mbrs[i].field_name for i in (mbr_i, mbr_j))))
+                used_ranges.append((mbr_i, mbr_j))
+                print('{:6} {:6} {:6} {:4} {:4} {:4} {:25} {:25}'.format(
+                    curr, end, end-curr, mbr_i, mbr_j-1, mbr_j-mbr_i,
+                    *(self.mbrs[i].field_name for i in (mbr_i, mbr_j-1))))
         if verbose:
             print()
             print('Missed:')
-            print('{:>3} {:>3} {:>3} {:25} {:25}'.format(
-                'frm', 'to', 'n', 'first_member', 'last_member'))
+            print('{:>25} {:>4} {:>4} {:25} {:25}'.format(
+                'M1', 'M2', 'N', 'StartField', 'EndField'))
             used_ranges = sorted(used_ranges)
             used_ranges.append((len(self.mbrs), None))
             prev_i = 0
             for used_i, used_j in used_ranges:
                 if used_i > prev_i:
-                    print('{:3} {:3} {:3} {:25} {:25}'.format(
+                    print('{:25} {:4} {:4} {:25} {:25}'.format(
                         prev_i, used_i-1, used_i-prev_i,
                         *(self.mbrs[i].field_name for i in (prev_i, used_i-1))))
                 prev_i = used_j
