@@ -31,17 +31,39 @@ class AssetDecoder:
 
 
 class JumbledAssetDecoder(AssetDecoder):
+    row = '{:>6} {:>6} {:>6} {:>6} {:>4} {:>4} {:>4} {:25} {:25}'
+    header = row.format('Gap', 'From', 'To', 'Bytes', 'M1', 'M2', 'Mbrs', 'StartField', 'EndField')
+
     def __init__(self, f, source_fn, first_offset):
         super().__init__(f, source_fn, first_offset)
+        self.prev_end = 0
+
+    def _dump_missed(self, used_ranges):
+        print('Missed:')
+        print(self.header)
+        used_ranges = sorted(used_ranges)
+        used_ranges.append((len(self.mbrs), '?', '?', '?'))
+        prev_i = 0
+        for used_i, used_j, used_o1, used_o2 in used_ranges:
+            if used_i > prev_i:
+                try:
+                    missed_o1 = next(o2 for u1, u2, o1, o2 in used_ranges
+                                     if u2 == prev_i)
+                except StopIteration:
+                    missed_o1 = '?'
+
+                print(self.row.format(
+                    '?', missed_o1, used_o1,  '?',
+                    prev_i, used_i-1, used_i-prev_i,
+                    *(self.mbrs[i].field_name for i in (prev_i, used_i-1))))
+            prev_i = used_j
 
     def decode_one(self, sections):
         if verbose_decode:
             print()
             print()
-            row = '{:>6} {:>6} {:>6} {:>4} {:>4} {:>4} {:25} {:25}'
-            header = row.format('From', 'To', 'Bytes', 'M1', 'M2', 'Mbrs', 'StartField', 'EndField')
             print('Used:')
-            print(header)
+            print(self.header)
             used_ranges = []
 
         item = {}
@@ -63,27 +85,13 @@ class JumbledAssetDecoder(AssetDecoder):
 
             if verbose_decode:
                 used_ranges.append((mbr_i, mbr_j, curr, end))
-                print(row.format(curr, end, end-curr, mbr_i, mbr_j-1, mbr_j-mbr_i,
-                                 *(self.mbrs[i].field_name for i in (mbr_i, mbr_j-1))))
-        if verbose_decode:
-            print('Missed:')
-            print(header)
-            used_ranges = sorted(used_ranges)
-            used_ranges.append((len(self.mbrs), '?', '?', '?'))
-            prev_i = 0
-            for used_i, used_j, used_o1, used_o2 in used_ranges:
-                if used_i > prev_i:
-                    try:
-                        missed_o1 = next(o2 for u1, u2, o1, o2 in used_ranges
-                                         if u2 == prev_i)
-                    except StopIteration:
-                        missed_o1 = '?'
+                print(self.row.format(curr-self.prev_end, curr, end, end-curr,
+                                      mbr_i, mbr_j-1, mbr_j-mbr_i,
+                                      *(self.mbrs[i].field_name for i in (mbr_i, mbr_j-1))))
+                self.prev_end = end
 
-                    print(row.format(
-                        missed_o1, used_o1,  '?',
-                        prev_i, used_i-1, used_i-prev_i,
-                        *(self.mbrs[i].field_name for i in (prev_i, used_i-1))))
-                prev_i = used_j
+        if verbose_decode:
+            self._dump_missed(used_ranges)
         return item
 
 
