@@ -1,6 +1,6 @@
 import typing
 from io import BytesIO, SEEK_CUR, SEEK_SET
-from os import path
+from pathlib import Path
 from struct import unpack
 
 # Unity asset directory file
@@ -59,9 +59,9 @@ def get_preload_table(
         path_id, offset, size, index = unpack('QIII', f.read(20))
         type1, type2 = class_ids[index]
 
-        if path_id in paths_to_search:
-            preload_table[path_id] = {'offset': offset + data_offset,
-                                      'size': size, 'type1': type1, 'type2': type2}
+        # if path_id in paths_to_search:
+        preload_table[path_id] = {'offset': offset + data_offset,
+                                  'size': size, 'type1': type1, 'type2': type2}
     return preload_table
 
 
@@ -99,30 +99,33 @@ def get_shared(
 def load_mono_behaviour(
     f: typing.BinaryIO,
     preload_table: dict[int, dict[str, int]],
-    shared_assets: dict[str, str],
+    shared_assets: list[dict[str, str]],
 ) -> None:
     for path_id, asset in preload_table.items():
-        assert (asset['type2'] == MONO_BEHAVIOUR)  # Only type supported here
-        f.seek(asset['offset'], SEEK_SET)
+        try:
+            assert (asset['type2'] == MONO_BEHAVIOUR)  # Only type supported here
+            f.seek(asset['offset'], SEEK_SET)
 
-        game_obj = get_shared(f, shared_assets)
-        enabled = bool(f.read(1)[0])
-        assert enabled
-        align4(f)
-        script = get_shared(f, shared_assets)
-        name = f.read(f_int(f)).decode('utf-8')
-        align4(f)
-        main_size = asset['size'] - (f.tell() - asset['offset'])
+            game_obj = get_shared(f, shared_assets)
+            enabled = bool(f.read(1)[0])
+            assert enabled
+            align4(f)
+            script = get_shared(f, shared_assets)
+            name = f.read(f_int(f)).decode('utf-8')
+            align4(f)
+            main_size = asset['size'] - (f.tell() - asset['offset'])
 
-        asset.update({'name': name, 'game_obj': game_obj, 'script': script,
-                      'data': f.read(main_size)})
+            asset.update({'name': name, 'game_obj': game_obj, 'script': script,
+                          'data': f.read(main_size)})
+        except AssertionError:
+            continue
 
 
 def search_asset_file(
-    fn: str,
+    fn: Path,
     paths_to_search: typing.Collection[int],
 ) -> dict[int, dict[str, typing.Any]]:
-    with open(fn, 'rb') as f:
+    with fn.open('rb') as f:
         table_size, data_end, file_gen, data_offset = unpack('>IIIIxxxx', f.read(20))
         assert(file_gen == 17)  # Unity 5.5.0+
 
@@ -145,19 +148,31 @@ def search_asset_file(
     return preload_table
 
 
-def get_dbs(steam_prefix: str) -> tuple[
+def get_dbs(steam_prefix: Path) -> tuple[
     dict[str, typing.Any],
     dict[str, typing.Any],
 ]:
     print('Loading game databases...', end=' ')
 
-    block_id, resource_id = 21228, 21231
-    fn = path.join(steam_prefix, r'steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data\sharedassets2.assets')
-    dbs = search_asset_file(fn, (block_id, resource_id))
-    block_db, resource_db = dbs[block_id], dbs[resource_id]
+    # block_id, resource_id = 21228, 21231  # in old version
+    block_id, resource_id = 21222, 21225  # in 64-bit version
+
+    directory = steam_prefix / r'steamapps\common\Blockhood\BLOCKHOOD v0_40_08_Data'
+    block_db = None
+    resource_db = None
+
+    for fn in directory.glob('*.assets'):
+        dbs = search_asset_file(fn, (block_id, resource_id))
+        by_name = {
+            v['name']: v
+            for v in dbs.values()
+            if 'name' in v
+        }
+        block_db = by_name.get('blockDB_current', block_db)
+        resource_db = by_name.get('resourceDB', resource_db)
+        if block_db and resource_db:
+            break
+
     print('Loaded %s %dkiB, %s %dkiB.' % (block_db['name'], block_db['size']/1024,
                                           resource_db['name'], resource_db['size']/1024))
-
-    assert(block_db['name'] == 'blockDB_current')
-    assert(resource_db['name'] == 'resourceDB')
     return block_db, resource_db
