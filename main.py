@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from pathlib import Path
 
 from analyse import Analyse
 from unity_asset_dir import get_dbs
@@ -57,8 +58,8 @@ def export_blocks(blocks):
             w.writerow(b)
 
 
-def main():
-    block_db, resource_db = get_dbs(r'D:\Program Files\SteamLibrary')
+def main() -> None:
+    block_db, resource_db = get_dbs(Path(r'D:\SteamLibrary'))
     blocks, resources = unpack_dbs(block_db['data'], resource_db['data'])
 
     # export_blocks(blocks)
@@ -69,4 +70,5 @@ def main():
     Analyse(blocks, resources).analyse()
 
 
-main()
+if __name__ == '__main__':
+    main()

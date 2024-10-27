@@ -1,11 +1,14 @@
+import typing
+
 import numpy as np
+import scipy.optimize
 from scipy.optimize import linprog
 
 
 min_air = 500
 max_res = 40             # Actually 80 but let's be safe
 init_money = 150         # Needs to be below 80 at the end
-max_area = 8 ** 2
+max_area = 8**2
 max_vol = max_area * 10  # include height
 rate_units = 20          # rates are in resource per 20s
 
@@ -24,7 +27,11 @@ class Analyse:
     Block counts must not be negative: implied by default value of `bounds`
     """
 
-    def __init__(self, blocks, resources):
+    def __init__(
+        self,
+        blocks: typing.Sequence[dict[str, typing.Any]],
+        resources: typing.Sequence[dict[str, typing.Any]],
+    ) -> None:
         self.resources, self.blocks = resources, blocks
         self.res_inds = {r['alias']: i for i, r in enumerate(resources)}
         self.air_index = self.res_inds['FRESH AIR']
@@ -37,7 +44,7 @@ class Analyse:
         self.c = self._get_c()
         self.aub, self.bub = self._get_bounds()
 
-    def _get_rates(self):
+    def _get_rates(self) -> tuple[np.ndarray, np.ndarray]:
         rates_no_opt = np.empty((self.nr, 0))          # Resource rates without optionals
         rates_opt = np.empty((self.nr, 0))             # Optional rates
 
@@ -60,14 +67,14 @@ class Analyse:
             rates_opt = np.append(rates_opt, opcol, 1)
         return rates_no_opt, rates_opt
 
-    def _get_c(self):
+    def _get_c(self) -> float:
         rates = self.rates_no_opt + self.rates_opt
         rates[self.air_index, :] *= -1  # Air production counts against cost
         rates[self.wild_index, :] = 0   # Wilderness does not count at all
         rates[self.money_index, :] = 0  # Money merit is non-linear so don't weigh it here
-        return np.sum(rates, 0)
+        return rates.sum(axis=0)
 
-    def _get_bounds(self):
+    def _get_bounds(self) -> tuple[np.ndarray, np.ndarray]:
         a_lower_rates = self.rates_no_opt              # Only mandatory rates influence minima
         b_lower_rates = np.zeros((self.nr, 1))         # Minimum rate for most resources is 0
         b_lower_rates[self.air_index] = min_air        # Lowest fresh air allowable
@@ -92,7 +99,7 @@ class Analyse:
                   np.append(b_upper_rates, b_upper_count, 0), 0)
         return a_upper, b_upper
 
-    def _show(self, res):
+    def _show(self, res: scipy.optimize.OptimizeResult) -> None:
         print('Iterations:', res.nit)
         print(res.message)
         print()
@@ -143,7 +150,7 @@ class Analyse:
         print('Number of blocks: %d' % sum(xr))
         print('Time to win (s): %.1f' % time)
 
-    def analyse(self):
+    def analyse(self) -> None:
         print('Calculating a solution for the zero-footprint challenge...')
 
         # Interior point converges much faster for this problem than simplex, which isn't surprising considering that it
