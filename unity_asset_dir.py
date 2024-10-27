@@ -1,3 +1,4 @@
+import typing
 from io import BytesIO, SEEK_CUR, SEEK_SET
 from os import path
 from struct import unpack
@@ -9,7 +10,7 @@ from struct import unpack
 MONO_BEHAVIOUR = 114
 
 
-def str_to_nul(f):
+def str_to_nul(f: typing.BinaryIO) -> str:
     s = BytesIO()
     while True:
         b = f.read(1)
@@ -19,17 +20,17 @@ def str_to_nul(f):
     return s.getvalue().decode('utf-8')
 
 
-def align4(f):
+def align4(f: typing.BinaryIO) -> None:
     p = f.tell() & 3
     if p:
         f.seek(4 - p, SEEK_CUR)
 
 
-def f_int(f):
+def f_int(f: typing.BinaryIO) -> int:
     return unpack('I', f.read(4))[0]
 
 
-def get_classes(f, base_count):
+def get_classes(f: typing.BinaryIO, base_count: int) -> list[tuple[int, int]]:
     class_ids = []
     for _ in range(base_count):
         class_id, type1 = unpack('<Ixh', f.read(7))
@@ -45,7 +46,12 @@ def get_classes(f, base_count):
     return class_ids
 
 
-def get_preload_table(f, class_ids, paths_to_search, data_offset):
+def get_preload_table(
+    f: typing.BinaryIO,
+    class_ids: list[tuple[int, int]],
+    paths_to_search: typing.Collection[int],
+    data_offset: int,
+) -> dict[int, dict[str, int]]:
     asset_count = f_int(f)
     preload_table = {}
     for _ in range(asset_count):
@@ -59,7 +65,7 @@ def get_preload_table(f, class_ids, paths_to_search, data_offset):
     return preload_table
 
 
-def consume_prio_preload(f):
+def consume_prio_preload(f: typing.BinaryIO) -> None:
     some_count = f_int(f)
     for _ in range(some_count):
         f.seek(4, SEEK_CUR)
@@ -67,7 +73,7 @@ def consume_prio_preload(f):
         f.seek(8, SEEK_CUR)
 
 
-def get_shared_assets(f):
+def get_shared_assets(f: typing.BinaryIO) -> list[dict[str, str]]:
     shared_file_count = f_int(f)
     shared_assets = []
     for _ in range(shared_file_count):
@@ -78,7 +84,10 @@ def get_shared_assets(f):
     return shared_assets
 
 
-def get_shared(f, shared_assets):
+def get_shared(
+    f: typing.BinaryIO,
+    shared_assets: list[dict[str, str]],
+) -> dict[str, int | dict[str, str]]:
     file_id, path_id = unpack('<IQ', f.read(12))
     if 0 <= file_id < len(shared_assets):
         shared = shared_assets[file_id]
@@ -87,7 +96,11 @@ def get_shared(f, shared_assets):
     return {'file_id': file_id, 'path_id': path_id, 'shared': shared}
 
 
-def load_mono_behaviour(f, preload_table, shared_assets):
+def load_mono_behaviour(
+    f: typing.BinaryIO,
+    preload_table: dict[int, dict[str, int]],
+    shared_assets: dict[str, str],
+) -> None:
     for path_id, asset in preload_table.items():
         assert (asset['type2'] == MONO_BEHAVIOUR)  # Only type supported here
         f.seek(asset['offset'], SEEK_SET)
@@ -105,7 +118,10 @@ def load_mono_behaviour(f, preload_table, shared_assets):
                       'data': f.read(main_size)})
 
 
-def search_asset_file(fn, paths_to_search):
+def search_asset_file(
+    fn: str,
+    paths_to_search: typing.Collection[int],
+) -> dict[int, dict[str, typing.Any]]:
     with open(fn, 'rb') as f:
         table_size, data_end, file_gen, data_offset = unpack('>IIIIxxxx', f.read(20))
         assert(file_gen == 17)  # Unity 5.5.0+
@@ -114,7 +130,10 @@ def search_asset_file(fn, paths_to_search):
         assert(ver == '5.6.2f1')
 
         platform, base_definitions, base_count = unpack('<I?I', f.read(9))
-        assert(platform == 5)         # StandaloneWindows
+
+        # assert(platform == 5)  # StandaloneWindows
+        assert platform == 19    # StandaloneWindows64
+
         assert(not base_definitions)  # not supported
 
         class_ids = get_classes(f, base_count)
@@ -126,7 +145,10 @@ def search_asset_file(fn, paths_to_search):
     return preload_table
 
 
-def get_dbs(steam_prefix):
+def get_dbs(steam_prefix: str) -> tuple[
+    dict[str, typing.Any],
+    dict[str, typing.Any],
+]:
     print('Loading game databases...', end=' ')
 
     block_id, resource_id = 21228, 21231
