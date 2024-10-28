@@ -42,7 +42,7 @@ class Analyse:
 
         # Generate as few resources as possible - except for fresh air, which should be maximized
         self.c = self._get_c()
-        self.aub, self.bub = self._get_bounds()
+        self.constraints = self._get_constraints()
 
     def _get_rates(self) -> tuple[np.ndarray, np.ndarray]:
         rates_no_opt = np.zeros((self.nr, self.nb))  # Resource rates without optionals
@@ -72,30 +72,25 @@ class Analyse:
         rates[self.money_index, :] = 0  # Money merit is non-linear so don't weigh it here
         return rates.sum(axis=0)
 
-    def _get_bounds(self) -> tuple[np.ndarray, np.ndarray]:
-        a_lower_rates = self.rates_no_opt              # Only mandatory rates influence minima
-        b_lower_rates = np.zeros((self.nr, 1))         # Minimum rate for most resources is 0
+    def _get_constraints(self) -> tuple[LinearConstraint, ...]:
+        # Only mandatory rates influence minima
+        b_lower_rates = np.zeros(self.nr)         # Minimum rate for most resources is 0
         b_lower_rates[self.air_index] = min_air        # Lowest fresh air allowable
         b_lower_rates[self.money_index] = -init_money  # Lowest rate of money - left with nothing
+        lower_rates_constraint = LinearConstraint(A=self.rates_no_opt, lb=b_lower_rates)
 
-        a_upper_rates = self.rates_no_opt + self.rates_opt  # Allow opt inputs to help rate maxima
-        b_upper_rates = np.full((self.nr, 1), max_res)      # Upper rate for most resources is 80
-        b_upper_rates[self.money_index] -= init_money       # Most amount of money left at end is 80
-
+        a_upper_rates = self.rates_no_opt + self.rates_opt          # Allow opt inputs to help rate maxima
+        b_upper_rates = np.full(shape=self.nr, fill_value=max_res)  # Upper rate for most resources is 80
+        b_upper_rates[self.money_index] -= init_money               # Most amount of money left at end is 80
         # Neither fresh air nor wilderness have maxima
-        a_upper_rates = np.delete(a_upper_rates, (self.air_index, self.wild_index), 0)
-        b_upper_rates = np.delete(b_upper_rates, (self.air_index, self.wild_index), 0)
+        a_upper_rates = np.delete(a_upper_rates, (self.air_index, self.wild_index), axis=0)
+        b_upper_rates = np.delete(b_upper_rates, (self.air_index, self.wild_index), axis=0)
+        upper_rates_constraint = LinearConstraint(A=a_upper_rates, ub=b_upper_rates)
 
         # The map is an 8x8 x 10 grid. As such, there is an upper bound on the block count.
-        a_upper_count = np.ones((1, self.nb))
-        b_upper_count = np.array(max_blocks, ndmin=2)
+        upper_count_constraint = LinearConstraint(A=np.ones(self.nb), ub=max_blocks)
 
-        # Lower bounds must be negated
-        a_upper = np.append(-a_lower_rates,
-                  np.append(a_upper_rates, a_upper_count, 0), 0)
-        b_upper = np.append(-b_lower_rates,
-                  np.append(b_upper_rates, b_upper_count, 0), 0)
-        return a_upper, b_upper
+        return lower_rates_constraint, upper_rates_constraint, upper_count_constraint
 
     def _show(self, res: scipy.optimize.OptimizeResult) -> None:
         print(res.message)
@@ -152,7 +147,7 @@ class Analyse:
             c=self.c,
             # integrality=True,
             bounds=Bounds(lb=0),
-            constraints=LinearConstraint(A=self.aub, ub=self.bub[:, 0]),
+            constraints=self.constraints,
         )
         if not res.success:
             raise ValueError(res.message)
