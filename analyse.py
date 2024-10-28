@@ -2,13 +2,14 @@ import typing
 
 import numpy as np
 import scipy.optimize
-from scipy.optimize import linprog, milp, LinearConstraint
+from scipy.optimize import milp, LinearConstraint, Bounds
 
 min_air = 500
 max_res = 40             # Actually 80 but let's be safe
 init_money = 150         # Needs to be below 80 at the end
 max_area = 8**2
-max_vol = max_area * 10  # include height
+max_height = 10  # should reduce to 1 for convenience
+max_blocks = max_height*max_area
 rate_units = 20          # rates are in resource per 20s
 
 
@@ -44,12 +45,12 @@ class Analyse:
         self.aub, self.bub = self._get_bounds()
 
     def _get_rates(self) -> tuple[np.ndarray, np.ndarray]:
-        rates_no_opt = np.empty((self.nr, 0))          # Resource rates without optionals
-        rates_opt = np.empty((self.nr, 0))             # Optional rates
+        rates_no_opt = np.zeros((self.nr, self.nb))  # Resource rates without optionals
+        rates_opt = np.zeros((self.nr, self.nb))     # Optional rates
 
         for b, block in enumerate(self.blocks):
-            nocol = np.zeros((self.nr, 1))             # Column of mandatory rates for this block
-            opcol = np.zeros((self.nr, 1))             # Column of optional rates for this block
+            nocol = rates_no_opt[:, b]  # Column view of mandatory rates for this block
+            opcol = rates_opt[:, b]     # Column view of optional rates for this block
 
             for res, qty in block['inputs'].items():
                 nocol[self.res_inds[res]] -= qty
@@ -62,8 +63,6 @@ class Analyse:
                     col = nocol
                 col[self.res_inds[res]] += qty
 
-            rates_no_opt = np.append(rates_no_opt, nocol, 1)
-            rates_opt = np.append(rates_opt, opcol, 1)
         return rates_no_opt, rates_opt
 
     def _get_c(self) -> np.ndarray:
@@ -89,7 +88,7 @@ class Analyse:
 
         # The map is an 8x8 x 10 grid. As such, there is an upper bound on the block count.
         a_upper_count = np.ones((1, self.nb))
-        b_upper_count = np.array(max_vol, ndmin=2)
+        b_upper_count = np.array(max_blocks, ndmin=2)
 
         # Lower bounds must be negated
         a_upper = np.append(-a_lower_rates,
@@ -152,6 +151,7 @@ class Analyse:
         res = milp(
             c=self.c,
             # integrality=True,
+            bounds=Bounds(lb=0),
             constraints=LinearConstraint(A=self.aub, ub=self.bub[:, 0]),
         )
         if not res.success:
