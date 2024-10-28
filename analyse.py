@@ -2,8 +2,7 @@ import typing
 
 import numpy as np
 import scipy.optimize
-from scipy.optimize import linprog
-
+from scipy.optimize import linprog, milp, LinearConstraint
 
 min_air = 500
 max_res = 40             # Actually 80 but let's be safe
@@ -67,7 +66,7 @@ class Analyse:
             rates_opt = np.append(rates_opt, opcol, 1)
         return rates_no_opt, rates_opt
 
-    def _get_c(self) -> float:
+    def _get_c(self) -> np.ndarray:
         rates = self.rates_no_opt + self.rates_opt
         rates[self.air_index, :] *= -1  # Air production counts against cost
         rates[self.wild_index, :] = 0   # Wilderness does not count at all
@@ -100,14 +99,11 @@ class Analyse:
         return a_upper, b_upper
 
     def _show(self, res: scipy.optimize.OptimizeResult) -> None:
-        print('Iterations:', res.nit)
         print(res.message)
         print()
-        if res.status != 0:
-            return
 
         block_counts = res.x
-        n_blocks = sum(block_counts)
+        n_blocks = block_counts.sum()
         norm_block_counts = block_counts * max_area/n_blocks
         round_block_counts = np.around(norm_block_counts)
 
@@ -153,8 +149,11 @@ class Analyse:
     def analyse(self) -> None:
         print('Calculating a solution for the zero-footprint challenge...')
 
-        # Interior point converges much faster for this problem than simplex, which isn't surprising considering that it
-        # "is intended to provide a faster and more reliable alternative to simplex, especially for large, sparse
-        # problems."
-        res = linprog(c=self.c, A_ub=self.aub, b_ub=self.bub, method='interior-point')
+        res = milp(
+            c=self.c,
+            # integrality=True,
+            constraints=LinearConstraint(A=self.aub, ub=self.bub[:, 0]),
+        )
+        if not res.success:
+            raise ValueError(res.message)
         self._show(res)
